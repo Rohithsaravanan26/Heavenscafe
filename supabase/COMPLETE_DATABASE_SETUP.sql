@@ -348,7 +348,6 @@ CREATE INDEX IF NOT EXISTS idx_sales_shop ON sales(shop_id, created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_sales_manager ON sales(manager_id);
 CREATE INDEX IF NOT EXISTS idx_sales_invoice ON sales(invoice_no);
 CREATE INDEX IF NOT EXISTS idx_sales_status ON sales(shop_id, status);
-CREATE INDEX IF NOT EXISTS idx_sales_date ON sales(shop_id, DATE(created_at));
 
 CREATE TABLE IF NOT EXISTS sale_items (
   id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
