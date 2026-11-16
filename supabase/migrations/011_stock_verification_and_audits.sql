@@ -78,7 +78,21 @@ CREATE INDEX IF NOT EXISTS idx_audit_items_audit
 CREATE INDEX IF NOT EXISTS idx_audit_items_status 
   ON inventory_audit_items(status);
 
--- ── 6. RLS POLICIES ──────────────────────────────────────────
+-- ── 6. RLS HELPER & POLICIES ─────────────────────────────────
+CREATE OR REPLACE FUNCTION auth_shop_id()
+RETURNS UUID
+LANGUAGE SQL SECURITY DEFINER STABLE
+AS $$
+  SELECT shop_id FROM profiles WHERE id = auth.uid() AND is_active = TRUE;
+$$;
+
+CREATE OR REPLACE FUNCTION current_user_shop_id()
+RETURNS UUID
+LANGUAGE SQL SECURITY DEFINER STABLE
+AS $$
+  SELECT shop_id FROM profiles WHERE id = auth.uid() AND is_active = TRUE;
+$$;
+
 ALTER TABLE raw_material_usage_logs ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_audits ENABLE ROW LEVEL SECURITY;
 ALTER TABLE inventory_audit_items ENABLE ROW LEVEL SECURITY;
@@ -87,24 +101,24 @@ DO $$ BEGIN
   -- raw_material_usage_logs
   DROP POLICY IF EXISTS "usage_logs_select" ON raw_material_usage_logs;
   CREATE POLICY "usage_logs_select" ON raw_material_usage_logs
-    FOR SELECT USING (shop_id = current_user_shop_id());
+    FOR SELECT USING (shop_id = auth_shop_id());
 
   DROP POLICY IF EXISTS "usage_logs_insert" ON raw_material_usage_logs;
   CREATE POLICY "usage_logs_insert" ON raw_material_usage_logs
-    FOR INSERT WITH CHECK (shop_id = current_user_shop_id());
+    FOR INSERT WITH CHECK (shop_id = auth_shop_id());
 
   -- inventory_audits
   DROP POLICY IF EXISTS "audits_select" ON inventory_audits;
   CREATE POLICY "audits_select" ON inventory_audits
-    FOR SELECT USING (shop_id = current_user_shop_id());
+    FOR SELECT USING (shop_id = auth_shop_id());
 
   DROP POLICY IF EXISTS "audits_insert" ON inventory_audits;
   CREATE POLICY "audits_insert" ON inventory_audits
-    FOR INSERT WITH CHECK (shop_id = current_user_shop_id());
+    FOR INSERT WITH CHECK (shop_id = auth_shop_id());
 
   DROP POLICY IF EXISTS "audits_update" ON inventory_audits;
   CREATE POLICY "audits_update" ON inventory_audits
-    FOR UPDATE USING (shop_id = current_user_shop_id());
+    FOR UPDATE USING (shop_id = auth_shop_id());
 
   -- inventory_audit_items
   DROP POLICY IF EXISTS "audit_items_select" ON inventory_audit_items;
@@ -112,7 +126,7 @@ DO $$ BEGIN
     FOR SELECT USING (
       EXISTS (
         SELECT 1 FROM inventory_audits a 
-        WHERE a.id = audit_id AND a.shop_id = current_user_shop_id()
+        WHERE a.id = audit_id AND a.shop_id = auth_shop_id()
       )
     );
 
@@ -121,7 +135,7 @@ DO $$ BEGIN
     FOR INSERT WITH CHECK (
       EXISTS (
         SELECT 1 FROM inventory_audits a 
-        WHERE a.id = audit_id AND a.shop_id = current_user_shop_id()
+        WHERE a.id = audit_id AND a.shop_id = auth_shop_id()
       )
     );
 END $$;
@@ -133,7 +147,7 @@ CREATE OR REPLACE FUNCTION receive_stock(
   p_supplier_id  UUID,
   p_reference_no TEXT,
   p_notes        TEXT,
-  p_items        JSONB  -- [{ingredient_id, quantity, quantity_purchased, quantity_received, unit_cost, discrepancy_reason}]
+  p_items        JSONB
 )
 RETURNS JSONB
 LANGUAGE plpgsql SECURITY DEFINER
@@ -152,14 +166,12 @@ DECLARE
   v_has_disc        BOOLEAN := FALSE;
   v_disc_count      INTEGER := 0;
 BEGIN
-  -- Create purchase order
   INSERT INTO purchase_orders (
     shop_id, supplier_id, reference_no, received_by, notes
   ) VALUES (
     p_shop_id, p_supplier_id, p_reference_no, p_manager_id, p_notes
   ) RETURNING id INTO v_po_id;
 
-  -- Process each item
   FOR v_item IN SELECT * FROM jsonb_array_elements(p_items) LOOP
     SELECT id, current_stock, name INTO v_ingredient
       FROM ingredients
@@ -171,8 +183,6 @@ BEGIN
 
     v_stock_before  := v_ingredient.current_stock;
     v_unit_cost     := COALESCE((v_item->>'unit_cost')::NUMERIC, 0);
-    
-    -- Support both old & new payload formats
     v_received_qty  := COALESCE((v_item->>'quantity_received')::NUMERIC, (v_item->>'quantity')::NUMERIC, 0);
     v_purchased_qty := COALESCE((v_item->>'quantity_purchased')::NUMERIC, v_received_qty);
     v_disc_qty      := v_received_qty - v_purchased_qty;
@@ -183,7 +193,6 @@ BEGIN
       v_disc_count := v_disc_count + 1;
     END IF;
 
-    -- Insert purchase item with full discrepancy details
     INSERT INTO purchase_items (
       purchase_order_id, ingredient_id, quantity, 
       quantity_purchased, quantity_received, discrepancy_quantity, discrepancy_reason,
@@ -191,7 +200,7 @@ BEGIN
     ) VALUES (
       v_po_id,
       (v_item->>'ingredient_id')::UUID,
-      v_received_qty, -- primary quantity reflects physical stock received
+      v_received_qty,
       v_purchased_qty,
       v_received_qty,
       v_disc_qty,
@@ -202,13 +211,11 @@ BEGIN
 
     v_total_cost := v_total_cost + (v_received_qty * v_unit_cost);
 
-    -- Update ingredient stock with PHYSICAL QUANTITY RECEIVED
     UPDATE ingredients
       SET current_stock = current_stock + v_received_qty,
           cost_per_unit = CASE WHEN v_unit_cost > 0 THEN v_unit_cost ELSE cost_per_unit END
       WHERE id = (v_item->>'ingredient_id')::UUID;
 
-    -- Record stock movement
     INSERT INTO stock_movements (
       shop_id, ingredient_id, movement_type, quantity, unit_cost,
       reference_id, reference_type, reason,
@@ -231,7 +238,6 @@ BEGIN
     );
   END LOOP;
 
-  -- Update purchase order with total cost & discrepancy flag
   UPDATE purchase_orders 
     SET total_cost = v_total_cost,
         has_discrepancy = v_has_disc,
@@ -241,7 +247,6 @@ BEGIN
         END
     WHERE id = v_po_id;
 
-  -- Create notification if missing items / discrepancy found
   IF v_has_disc THEN
     INSERT INTO notifications (
       shop_id, type, title, message, related_id, related_type
@@ -255,7 +260,6 @@ BEGIN
     );
   END IF;
 
-  -- Audit log
   INSERT INTO audit_logs (shop_id, user_id, action_type, table_name, record_id, new_value)
   VALUES (
     p_shop_id, p_manager_id, 'STOCK_RECEIVED_VERIFIED', 'purchase_orders', v_po_id,
@@ -274,7 +278,7 @@ BEGIN
 END;
 $$;
 
--- ── 8. FUNCTION: record_raw_material_usage (with avg usage analysis) ──
+-- ── 8. FUNCTION: record_raw_material_usage ───────────────────
 CREATE OR REPLACE FUNCTION record_raw_material_usage(
   p_shop_id          UUID,
   p_manager_id       UUID,
@@ -294,7 +298,6 @@ DECLARE
   v_variance_pct     NUMERIC := 0;
   v_status           TEXT := 'normal';
   v_log_id           UUID;
-  v_stock_before     NUMERIC;
 BEGIN
   SELECT id, name, unit, current_stock INTO v_ing
     FROM ingredients
@@ -304,9 +307,6 @@ BEGIN
     RAISE EXCEPTION 'Ingredient not found';
   END IF;
 
-  v_stock_before := v_ing.current_stock;
-
-  -- 1. Calculate expected usage from today's completed sales
   SELECT COALESCE(SUM(si.quantity * COALESCE(ri.avg_usage_per_sale, ri.quantity, 1)), 0)
     INTO v_sales_usage
     FROM sales s
@@ -318,21 +318,18 @@ BEGIN
       AND s.status = 'completed'
       AND ri.ingredient_id = p_ingredient_id;
 
-  -- 2. Check 30-day average daily usage if sales recipe not configured
   SELECT COALESCE(avg_daily_usage, 0) INTO v_avg_daily_usage
     FROM v_ingredient_avg_usage
     WHERE ingredient_id = p_ingredient_id;
 
-  -- Use sales-based expected usage if available, else average daily usage
   IF v_sales_usage > 0 THEN
     v_expected_usage := ROUND(v_sales_usage, 3);
   ELSIF v_avg_daily_usage > 0 THEN
     v_expected_usage := ROUND(v_avg_daily_usage, 3);
   ELSE
-    v_expected_usage := p_reported_usage; -- baseline when no history
+    v_expected_usage := p_reported_usage;
   END IF;
 
-  -- 3. Calculate Variance
   v_variance := p_reported_usage - v_expected_usage;
   IF v_expected_usage > 0 THEN
     v_variance_pct := ROUND(((v_variance / v_expected_usage) * 100), 2);
@@ -340,7 +337,6 @@ BEGIN
     v_variance_pct := 0;
   END IF;
 
-  -- 4. Status determination (threshold: +20% is high variance, -25% is low variance)
   IF v_variance_pct > 20.00 THEN
     v_status := 'high_variance';
   ELSIF v_variance_pct < -25.00 THEN
@@ -349,7 +345,6 @@ BEGIN
     v_status := 'normal';
   END IF;
 
-  -- 5. Record log
   INSERT INTO raw_material_usage_logs (
     shop_id, manager_id, ingredient_id, usage_date,
     reported_usage, expected_usage, variance, variance_percent,
@@ -360,7 +355,6 @@ BEGIN
     v_status, p_notes
   ) RETURNING id INTO v_log_id;
 
-  -- 6. Trigger admin alert if high abnormal variance detected
   IF v_status = 'high_variance' THEN
     INSERT INTO notifications (
       shop_id, type, title, message, related_id, related_type
@@ -368,7 +362,7 @@ BEGIN
       p_shop_id,
       'abnormal_usage',
       'Abnormal Raw Material Usage: ' || v_ing.name,
-      'Manager reported ' || p_reported_usage || ' ' || v_ing.unit || ' used today, which is +' || v_variance_pct || '% above normal expected usage (' || v_expected_usage || ' ' || v_ing.unit || ').',
+      'Manager reported ' || p_reported_usage || ' ' || v_ing.unit || ' used today (+' || v_variance_pct || '% above normal expected).',
       v_log_id,
       'raw_material_usage'
     );
@@ -385,12 +379,12 @@ BEGIN
 END;
 $$;
 
--- ── 9. FUNCTION: submit_inventory_audit (Physical stock take & missing check) ──
+-- ── 9. FUNCTION: submit_inventory_audit ──────────────────────
 CREATE OR REPLACE FUNCTION submit_inventory_audit(
-  p_shop_id        UUID,
-  p_manager_id     UUID,
-  p_notes          TEXT,
-  p_items          JSONB,   -- [{ingredient_id, physical_count, notes}]
+  p_shop_id         UUID,
+  p_manager_id      UUID,
+  p_notes           TEXT,
+  p_items           JSONB,
   p_reconcile_stock BOOLEAN DEFAULT FALSE
 )
 RETURNS JSONB
@@ -408,7 +402,6 @@ DECLARE
   v_total_audited   INTEGER := 0;
   v_status          TEXT;
 BEGIN
-  -- Create audit header
   INSERT INTO inventory_audits (
     shop_id, audited_by, notes, status
   ) VALUES (
@@ -455,7 +448,6 @@ BEGIN
         v_item->>'notes'
       );
 
-      -- If reconcile requested, update system stock to match physical reality
       IF p_reconcile_stock AND v_diff != 0 THEN
         UPDATE ingredients
           SET current_stock = (v_item->>'physical_count')::NUMERIC
@@ -476,7 +468,6 @@ BEGIN
     END IF;
   END LOOP;
 
-  -- Update audit totals
   UPDATE inventory_audits
     SET total_items_audited = v_total_audited,
         missing_items_count = v_missing_count,
@@ -484,7 +475,6 @@ BEGIN
         total_loss_value    = v_total_loss
     WHERE id = v_audit_id;
 
-  -- If missing items found, notify Admin immediately
   IF v_missing_count > 0 THEN
     INSERT INTO notifications (
       shop_id, type, title, message, related_id, related_type
