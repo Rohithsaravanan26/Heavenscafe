@@ -70,6 +70,7 @@ export function POSTerminal({
   const [paymentMethod, setPaymentMethod] = React.useState<'cash' | 'upi' | 'card' | 'other'>('cash')
   const [amountTendered, setAmountTendered] = React.useState<string>("")
   const [paymentRef, setPaymentRef] = React.useState("")
+  const [cardLast4, setCardLast4] = React.useState("")
   const [submitting, setSubmitting] = React.useState(false)
   const [checkoutError, setCheckoutError] = React.useState<string | null>(null)
 
@@ -147,6 +148,7 @@ export function POSTerminal({
     setDiscountReason("")
     setAmountTendered("")
     setPaymentRef("")
+    setCardLast4("")
     setCheckoutError(null)
   }
 
@@ -197,7 +199,9 @@ export function POSTerminal({
         payment_amount: totalAmount,
         amount_tendered: paymentMethod === 'cash' && tenderedNum > 0 ? tenderedNum : null,
         change_amount: paymentMethod === 'cash' && changeAmount > 0 ? changeAmount : null,
-        payment_ref: paymentRef.trim() || null,
+        payment_ref: paymentRef.trim()
+          ? paymentRef.trim() + (cardLast4.trim() ? ' | Card:****' + cardLast4.trim() : '')
+          : (cardLast4.trim() ? 'Card:****' + cardLast4.trim() : null),
         customer_name: customerName.trim() || null,
         customer_phone: customerPhone.trim() || null,
       }
@@ -571,15 +575,67 @@ export function POSTerminal({
               </div>
             )}
 
-            {/* UPI / Card Reference */}
-            {(paymentMethod === 'upi' || paymentMethod === 'card') && (
-              <Input
-                type="text"
-                placeholder={paymentMethod === 'upi' ? "UPI Reference / Txn ID" : "Card Auth / Last 4 Digits"}
-                value={paymentRef}
-                onChange={(e) => setPaymentRef(e.target.value)}
-                className="h-8 text-xs bg-[#F8F3E9]"
-              />
+            {/* UPI Reference */}
+            {paymentMethod === 'upi' && (
+              <div>
+                <label className="text-[10px] font-semibold text-[#705B51] block mb-0.5">
+                  UPI Reference ID (optional)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="e.g. 123456789012"
+                  value={paymentRef}
+                  onChange={(e) => setPaymentRef(e.target.value)}
+                  className="h-8 text-xs bg-[#F8F3E9]"
+                />
+              </div>
+            )}
+
+            {/* Card Fields */}
+            {paymentMethod === 'card' && (
+              <div className="space-y-2">
+                <div>
+                  <label className="text-[10px] font-semibold text-[#705B51] block mb-0.5">
+                    Card Last 4 Digits (optional)
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="e.g. 4242"
+                    value={cardLast4}
+                    onChange={(e) => setCardLast4(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                    maxLength={4}
+                    className="h-8 text-xs bg-[#F8F3E9]"
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] font-semibold text-[#705B51] block mb-0.5">
+                    Card Reference / Auth Code (optional)
+                  </label>
+                  <Input
+                    type="text"
+                    placeholder="Authorization code"
+                    value={paymentRef}
+                    onChange={(e) => setPaymentRef(e.target.value)}
+                    className="h-8 text-xs bg-[#F8F3E9]"
+                  />
+                </div>
+              </div>
+            )}
+
+            {/* Other Reference */}
+            {paymentMethod === 'other' && (
+              <div>
+                <label className="text-[10px] font-semibold text-[#705B51] block mb-0.5">
+                  Reference / Note (optional)
+                </label>
+                <Input
+                  type="text"
+                  placeholder="Transaction reference or note"
+                  value={paymentRef}
+                  onChange={(e) => setPaymentRef(e.target.value)}
+                  className="h-8 text-xs bg-[#F8F3E9]"
+                />
+              </div>
             )}
 
             {checkoutError && (

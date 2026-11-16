@@ -384,6 +384,7 @@ export interface CheckoutPayload {
   amount_tendered?: number | null
   change_amount?: number | null
   payment_ref?: string | null
+  card_last4?: string | null
   customer_name?: string | null
   customer_phone?: string | null
 }

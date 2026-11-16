@@ -1,8 +1,14 @@
 import { getDashboardOverview } from "@/lib/actions/analytics"
+import { getLowStockCount } from "@/lib/actions/inventory"
 import { DashboardOverview } from "@/components/admin/DashboardOverview"
 
-export default async function AdminDashboardPage() {
-  const overviewData = await getDashboardOverview()
+export const dynamic = "force-dynamic"
 
-  return <DashboardOverview data={overviewData} />
+export default async function AdminDashboardPage() {
+  const [overviewData, lowStockCount] = await Promise.all([
+    getDashboardOverview(),
+    getLowStockCount(),
+  ])
+
+  return <DashboardOverview data={overviewData} lowStockCount={lowStockCount} />
 }

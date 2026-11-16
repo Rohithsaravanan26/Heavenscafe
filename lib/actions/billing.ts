@@ -106,7 +106,9 @@ export async function completeSaleAction(payload: CheckoutPayload) {
     p_payment_amount: verifiedTotal,
     p_amount_tendered: payload.amount_tendered || null,
     p_change_amount: payload.change_amount || null,
-    p_payment_ref: payload.payment_ref || null,
+    p_payment_ref: payload.payment_ref
+      ? payload.payment_ref + (payload.card_last4 ? ' | Card:****' + payload.card_last4 : '')
+      : (payload.card_last4 ? 'Card:****' + payload.card_last4 : null),
     p_customer_name: payload.customer_name || null,
     p_customer_phone: payload.customer_phone || null,
   })

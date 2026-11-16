@@ -13,10 +13,11 @@ import {
   History,
   Bell,
   LogOut,
-  ExternalLink,
+  AlertTriangle,
 } from "lucide-react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { getNotifications } from "@/lib/actions/notifications"
+import { getLowStockCount } from "@/lib/actions/inventory"
 import { Button } from "@/components/ui/button"
 import { logoutAction } from "@/lib/actions/auth"
 
@@ -27,9 +28,10 @@ export default async function AdminLayout({
 }: {
   children: React.ReactNode
 }) {
-  const [authData, notifications] = await Promise.all([
+  const [authData, notifications, lowStockCount] = await Promise.all([
     getCurrentUser(),
     getNotifications(true), // unread only
+    getLowStockCount(),
   ])
 
   const profile = authData?.profile
@@ -85,19 +87,8 @@ export default async function AdminLayout({
           })}
         </nav>
 
-        {/* Footer with switch to POS & User Info */}
+        {/* Footer with User Info */}
         <div className="p-4 border-t border-[#E8DED0] space-y-3">
-          <Link href="/pos" target="_blank">
-            <Button
-              variant="outline"
-              size="sm"
-              className="w-full text-xs border-[#E8DED0] bg-[#F8F3E9] hover:bg-[#EFE7DA] text-[#43291F] font-semibold justify-between"
-            >
-              <span>Launch POS Terminal</span>
-              <ExternalLink className="w-3.5 h-3.5 text-[#B56C4A]" />
-            </Button>
-          </Link>
-
           <div className="flex items-center justify-between pt-2">
             <div className="min-w-0">
               <p className="text-xs font-bold text-[#43291F] truncate">
@@ -144,16 +135,17 @@ export default async function AdminLayout({
               </div>
             </Link>
 
-            {/* Quick POS link on tablet */}
-            <Link href="/pos" className="hidden sm:inline-block">
-              <Button
-                variant="outline"
-                size="sm"
-                className="text-xs border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F]"
-              >
-                Open POS
-              </Button>
-            </Link>
+            {/* Low Stock Alert Badge */}
+            {lowStockCount > 0 && (
+              <Link href="/admin/inventory">
+                <div className="relative p-2 rounded-lg text-[#705B51] hover:text-[#43291F] hover:bg-[#F8F3E9] cursor-pointer">
+                  <AlertTriangle className="w-5 h-5" />
+                  <span className="absolute top-1 right-1 w-4 h-4 rounded-full bg-red-700 text-white text-[10px] font-bold flex items-center justify-center">
+                    {lowStockCount}
+                  </span>
+                </div>
+              </Link>
+            )}
           </div>
         </header>
 

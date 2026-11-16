@@ -204,3 +204,103 @@ export async function getStockMovements(limit = 100) {
   if (error) return []
   return data
 }
+
+// ── NEW ACTIONS ────────────────────────────────────────────────────────────────
+
+export async function getLowStockCount(): Promise<number> {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return 0
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('shop_id')
+    .eq('id', user.id)
+    .single()
+  if (!profile) return 0
+
+  // Supabase JS v2 doesn't support column-to-column comparisons directly;
+  // fetch minimal rows and filter in JS.
+  const { data: rows, error } = await supabase
+    .from('ingredients')
+    .select('id, current_stock, min_stock')
+    .eq('shop_id', profile.shop_id)
+    .eq('is_active', true)
+
+  if (error || !rows) return 0
+  return rows.filter((r) => Number(r.current_stock) <= Number(r.min_stock)).length
+}
+
+export async function getLowStockIngredients() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('shop_id')
+    .eq('id', user.id)
+    .single()
+  if (!profile) return []
+
+  const { data, error } = await supabase
+    .from('ingredients')
+    .select(`
+      id,
+      name,
+      unit,
+      current_stock,
+      min_stock,
+      preferred_supplier_id,
+      suppliers (name, phone)
+    `)
+    .eq('shop_id', profile.shop_id)
+    .eq('is_active', true)
+    .order('name')
+
+  if (error || !data) return []
+  return data.filter((r) => Number(r.current_stock) <= Number(r.min_stock))
+}
+
+export async function getStockPurchaseHistory(limit = 100) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('purchase_orders')
+    .select(`
+      *,
+      purchase_items (
+        *,
+        ingredients (name, unit)
+      ),
+      suppliers (name, phone)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) return []
+  return data
+}
+
+export async function updateIngredientAvgUsage(ingredientId: string, avgUsage: number) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Unauthorized' }
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('role')
+    .eq('id', user.id)
+    .single()
+  if (profile?.role !== 'ADMIN') return { success: false, error: 'Admin permission required' }
+
+  const { error } = await supabase
+    .from('recipe_items')
+    .update({ avg_usage_per_sale: avgUsage })
+    .eq('ingredient_id', ingredientId)
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/inventory')
+  return { success: true }
+}

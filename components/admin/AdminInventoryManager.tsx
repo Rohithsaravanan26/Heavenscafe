@@ -10,6 +10,7 @@ import {
   ArrowDownRight,
   ArrowUpRight,
   Search,
+  ShoppingCart,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,17 +28,23 @@ interface AdminInventoryManagerProps {
   ingredients: any[]
   suppliers: any[]
   movements: any[]
+  lowStockItems?: any[]
+  purchaseHistory?: any[]
 }
 
 export function AdminInventoryManager({
   ingredients: initialIngredients,
   suppliers: initialSuppliers,
   movements: initialMovements,
+  lowStockItems = [],
+  purchaseHistory = [],
 }: AdminInventoryManagerProps) {
   const [ingredients, setIngredients] = React.useState<any[]>(initialIngredients)
   const [suppliers, setSuppliers] = React.useState<any[]>(initialSuppliers)
   const [search, setSearch] = React.useState("")
-  const [activeTab, setActiveTab] = React.useState<"ingredients" | "movements" | "suppliers">("ingredients")
+  const [activeTab, setActiveTab] = React.useState<"alerts" | "ingredients" | "movements" | "purchases" | "suppliers">(
+    lowStockItems.length > 0 ? "alerts" : "ingredients"
+  )
 
   // Modals
   const [showAddIngModal, setShowAddIngModal] = React.useState(false)
@@ -97,6 +104,22 @@ export function AdminInventoryManager({
       {/* View Tabs */}
       <div className="flex items-center gap-1 border-b border-[#E8DED0] pb-2">
         <button
+          onClick={() => setActiveTab("alerts")}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === "alerts"
+              ? "bg-red-700 text-white"
+              : "bg-red-50 text-red-700 hover:bg-red-100"
+          }`}
+        >
+          <AlertTriangle className="w-3.5 h-3.5" />
+          Low Stock Alerts
+          {lowStockItems.length > 0 && (
+            <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black ${activeTab === "alerts" ? "bg-white text-red-700" : "bg-red-700 text-white"}`}>
+              {lowStockItems.length}
+            </span>
+          )}
+        </button>
+        <button
           onClick={() => setActiveTab("ingredients")}
           className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
             activeTab === "ingredients"
@@ -126,7 +149,90 @@ export function AdminInventoryManager({
         >
           Suppliers Directory ({suppliers.length})
         </button>
+
+        <button
+          onClick={() => setActiveTab("purchases")}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === "purchases"
+              ? "bg-[#43291F] text-white"
+              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
+          }`}
+        >
+          <ShoppingCart className="w-3.5 h-3.5" />
+          Purchase History ({purchaseHistory.length})
+        </button>
       </div>
+
+      {/* ── TAB 0: LOW STOCK ALERTS ── */}
+      {activeTab === "alerts" && (
+        <Card className="border-2 border-red-200 bg-red-50/40 shadow-sm overflow-hidden">
+          <CardHeader className="pb-2 pt-4 px-4">
+            <CardTitle className="text-sm font-serif font-bold text-red-800 flex items-center gap-2">
+              <AlertTriangle className="w-4 h-4" />
+              Restock Needed — {lowStockItems.length} ingredient{lowStockItems.length !== 1 ? "s" : ""} below minimum stock
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {lowStockItems.length === 0 ? (
+              <div className="py-14 text-center text-[#A09289]">
+                <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-30 text-red-400" />
+                <p className="font-serif font-bold text-base text-[#43291F]">All Stock Levels Healthy</p>
+                <p className="text-xs text-[#705B51] mt-1">No ingredients are below their minimum threshold.</p>
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-red-100 border-b border-red-200 font-serif font-bold text-red-900">
+                    <tr>
+                      <th className="py-3 px-4">Name</th>
+                      <th className="py-3 px-4">Current</th>
+                      <th className="py-3 px-4">Minimum</th>
+                      <th className="py-3 px-4">Shortfall</th>
+                      <th className="py-3 px-4">Supplier</th>
+                      <th className="py-3 px-4 text-right">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-red-100">
+                    {lowStockItems.map((item) => {
+                      const shortfall = Math.max(0, Number(item.min_stock) - Number(item.current_stock))
+                      const isOut = Number(item.current_stock) <= 0
+                      const isCritical = Number(item.current_stock) <= Number(item.min_stock) * 0.5
+                      return (
+                        <tr key={item.id} className="hover:bg-red-50 transition-colors">
+                          <td className="py-3 px-4 font-bold text-[#43291F]">{item.name}</td>
+                          <td className="py-3 px-4 font-mono text-red-700 font-semibold">
+                            {item.current_stock} {item.unit}
+                          </td>
+                          <td className="py-3 px-4 text-[#705B51]">
+                            {item.min_stock} {item.unit}
+                          </td>
+                          <td className="py-3 px-4 font-bold text-red-800">
+                            {shortfall.toFixed(2)} {item.unit}
+                          </td>
+                          <td className="py-3 px-4 text-[#705B51]">
+                            {item.suppliers?.name || "Direct Purchase"}
+                            {item.suppliers?.phone && (
+                              <span className="block font-mono text-[10px] text-[#A09289]">{item.suppliers.phone}</span>
+                            )}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <Badge
+                              variant={isOut ? "destructive" : isCritical ? "destructive" : "warning"}
+                              className="text-[10px]"
+                            >
+                              {isOut ? "Out of Stock" : isCritical ? "Critical Low" : "Low Stock"}
+                            </Badge>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── TAB 1: INGREDIENTS TABLE ── */}
       {activeTab === "ingredients" && (
@@ -327,6 +433,77 @@ export function AdminInventoryManager({
               <p className="font-serif font-bold text-base text-[#43291F]">No Suppliers Configured</p>
               <p className="text-xs text-[#705B51] mt-1">
                 Add dairy, bakery, and produce suppliers to streamline inward stock receipts.
+              </p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── TAB 4: PURCHASE HISTORY (Admin cross-verify) ── */}
+      {activeTab === "purchases" && (
+        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
+          <div className="p-3 border-b border-[#E8DED0]">
+            <p className="text-xs font-bold text-[#43291F]">Stock Purchase History</p>
+            <p className="text-[11px] text-[#705B51] mt-0.5">
+              All stock received by managers — cross-verify quantities, costs, and suppliers
+            </p>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
+                <tr>
+                  <th className="py-3 px-4">Date</th>
+                  <th className="py-3 px-4">Supplier</th>
+                  <th className="py-3 px-4">Items Received</th>
+                  <th className="py-3 px-4">Total Cost</th>
+                  <th className="py-3 px-4">Reference No.</th>
+                  <th className="py-3 px-4 text-right">Notes</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8DED0]">
+                {purchaseHistory.map((po) => (
+                  <tr key={po.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
+                    <td className="py-3 px-4 text-[#705B51]">{formatDateTime(po.created_at)}</td>
+                    <td className="py-3 px-4 font-bold text-[#43291F]">
+                      {po.suppliers?.name || "Direct Purchase"}
+                      {po.suppliers?.phone && (
+                        <span className="block font-mono text-[10px] text-[#A09289]">{po.suppliers.phone}</span>
+                      )}
+                    </td>
+                    <td className="py-3 px-4">
+                      <div className="space-y-0.5">
+                        {po.purchase_items?.map((pi: any) => (
+                          <div key={pi.id} className="text-[11px]">
+                            <span className="font-semibold text-[#43291F]">{pi.ingredients?.name}</span>
+                            <span className="text-[#705B51] ml-1">
+                              × {pi.quantity} {pi.ingredients?.unit}
+                              {pi.unit_cost > 0 && <span className="ml-1 text-[#A09289]">@ ₹{pi.unit_cost}/{pi.ingredients?.unit}</span>}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </td>
+                    <td className="py-3 px-4 font-bold font-serif text-[#43291F]">
+                      {po.total_cost > 0 ? `₹${Number(po.total_cost).toFixed(2)}` : "—"}
+                    </td>
+                    <td className="py-3 px-4 font-mono text-[#705B51]">
+                      {po.reference_no || "—"}
+                    </td>
+                    <td className="py-3 px-4 text-right text-[#A09289]">
+                      {po.notes || "—"}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {purchaseHistory.length === 0 && (
+            <div className="py-14 text-center text-[#A09289]">
+              <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="font-serif font-bold text-base text-[#43291F]">No Purchase Records Yet</p>
+              <p className="text-xs text-[#705B51] mt-1">
+                Stock inward receipts submitted by the manager will appear here for admin review.
               </p>
             </div>
           )}

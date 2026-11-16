@@ -11,7 +11,6 @@ import {
   Wallet,
   ArrowUpRight,
   Coffee,
-  Plus,
 } from "lucide-react"
 import {
   ResponsiveContainer,
@@ -45,9 +44,10 @@ interface DashboardOverviewProps {
     recent_trend: any[]
     low_stock_items: any[]
   } | null
+  lowStockCount?: number
 }
 
-export function DashboardOverview({ data }: DashboardOverviewProps) {
+export function DashboardOverview({ data, lowStockCount }: DashboardOverviewProps) {
   if (!data) {
     return (
       <div className="py-12 text-center">
@@ -73,14 +73,36 @@ export function DashboardOverview({ data }: DashboardOverviewProps) {
         </div>
 
         <div className="flex items-center gap-2">
-          <Link href="/pos" target="_blank">
-            <Button size="sm" className="bg-[#43291F] hover:bg-[#341F17] text-white text-xs font-semibold">
-              <Plus className="w-3.5 h-3.5 mr-1" />
-              New Sale in POS
+          <Link href="/admin/inventory">
+            <Button size="sm" variant="outline" className="border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F] text-xs font-semibold">
+              <AlertTriangle className="w-3.5 h-3.5 mr-1 text-[#B56C4A]" />
+              View Stock Alerts
             </Button>
           </Link>
         </div>
       </div>
+
+      {/* ── LOW STOCK ALERT BANNER ── */}
+      {(lowStockCount ?? 0) > 0 && (
+        <Link href="/admin/inventory">
+          <Card className="border-2 border-red-500 bg-red-50/60 shadow-sm cursor-pointer hover:bg-red-50 transition-colors">
+            <CardContent className="p-4 flex items-center gap-4">
+              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-5 h-5 text-red-700" />
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-red-800">
+                  Low Stock Alert — {lowStockCount} ingredient{(lowStockCount ?? 0) > 1 ? "s" : ""} need restocking
+                </p>
+                <p className="text-xs text-red-700 mt-0.5">
+                  Tap to view the Inventory &amp; Stock page and reorder supplies
+                </p>
+              </div>
+              <ArrowUpRight className="w-5 h-5 text-red-600 shrink-0" />
+            </CardContent>
+          </Card>
+        </Link>
+      )}
 
       {/* ── KPI METRICS CARDS ── */}
       <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
