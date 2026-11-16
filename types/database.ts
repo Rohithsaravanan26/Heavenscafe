@@ -248,11 +248,14 @@ export interface PurchaseOrder {
   received_by: string
   total_cost: number
   notes: string | null
+  has_discrepancy?: boolean
+  discrepancy_summary?: string | null
   received_at: string
   created_at: string
   // relations
   suppliers?: Supplier
   purchase_items?: PurchaseItem[]
+  profiles?: Profile
 }
 
 export interface PurchaseItem {
@@ -260,8 +263,58 @@ export interface PurchaseItem {
   purchase_order_id: string
   ingredient_id: string
   quantity: number
+  quantity_purchased?: number
+  quantity_received?: number
+  discrepancy_quantity?: number
+  discrepancy_reason?: string | null
   unit_cost: number
   total_cost: number
+  ingredients?: Ingredient
+}
+
+export interface RawMaterialUsageLog {
+  id: string
+  shop_id: string
+  manager_id: string
+  ingredient_id: string
+  usage_date: string
+  reported_usage: number
+  expected_usage: number
+  variance: number
+  variance_percent: number
+  status: 'normal' | 'high_variance' | 'low_variance'
+  notes: string | null
+  created_at: string
+  ingredients?: Ingredient
+  profiles?: Profile
+}
+
+export interface InventoryAudit {
+  id: string
+  shop_id: string
+  audited_by: string
+  status: 'pending_review' | 'completed' | 'reconciled'
+  total_items_audited: number
+  missing_items_count: number
+  surplus_items_count: number
+  total_loss_value: number
+  notes: string | null
+  created_at: string
+  profiles?: Profile
+  inventory_audit_items?: InventoryAuditItem[]
+}
+
+export interface InventoryAuditItem {
+  id: string
+  audit_id: string
+  ingredient_id: string
+  system_stock: number
+  physical_count: number
+  difference: number
+  unit_cost: number
+  loss_value: number
+  status: 'matched' | 'missing' | 'surplus'
+  notes: string | null
   ingredients?: Ingredient
 }
 

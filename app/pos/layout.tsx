@@ -1,6 +1,6 @@
 import * as React from "react"
 import Link from "next/link"
-import { Coffee, Receipt, PackagePlus, Trash2, CalendarCheck, LogOut, Wifi } from "lucide-react"
+import { Coffee, Receipt, PackagePlus, Trash2, CalendarCheck, LogOut, Wifi, Scale, ClipboardCheck } from "lucide-react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { Button } from "@/components/ui/button"
 import { logoutAction } from "@/lib/actions/auth"
@@ -54,6 +54,18 @@ export default async function POSLayout({
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
                 <PackagePlus className="w-4 h-4 mr-1 text-[#737B52]" />
                 Stock Inward
+              </Button>
+            </Link>
+            <Link href="/pos/usage">
+              <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
+                <Scale className="w-4 h-4 mr-1 text-[#B56C4A]" />
+                Daily Usage
+              </Button>
+            </Link>
+            <Link href="/pos/audit">
+              <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
+                <ClipboardCheck className="w-4 h-4 mr-1 text-[#737B52]" />
+                Stock Audit
               </Button>
             </Link>
             <Link href="/pos/wastage">
@@ -118,6 +130,16 @@ export default async function POSLayout({
           <Link href="/pos/stock">
             <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
               Stock In
+            </span>
+          </Link>
+          <Link href="/pos/usage">
+            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+              Daily Usage
+            </span>
+          </Link>
+          <Link href="/pos/audit">
+            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+              Audit
             </span>
           </Link>
           <Link href="/pos/wastage">

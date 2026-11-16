@@ -11,6 +11,10 @@ import {
   ArrowUpRight,
   Search,
   ShoppingCart,
+  Scale,
+  ClipboardCheck,
+  CheckCircle2,
+  ShieldAlert,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +34,8 @@ interface AdminInventoryManagerProps {
   movements: any[]
   lowStockItems?: any[]
   purchaseHistory?: any[]
+  usageLogs?: any[]
+  audits?: any[]
 }
 
 export function AdminInventoryManager({
@@ -38,13 +44,15 @@ export function AdminInventoryManager({
   movements: initialMovements,
   lowStockItems = [],
   purchaseHistory = [],
+  usageLogs = [],
+  audits = [],
 }: AdminInventoryManagerProps) {
   const [ingredients, setIngredients] = React.useState<any[]>(initialIngredients)
   const [suppliers, setSuppliers] = React.useState<any[]>(initialSuppliers)
   const [search, setSearch] = React.useState("")
-  const [activeTab, setActiveTab] = React.useState<"alerts" | "ingredients" | "movements" | "purchases" | "suppliers">(
-    lowStockItems.length > 0 ? "alerts" : "ingredients"
-  )
+  const [activeTab, setActiveTab] = React.useState<
+    "alerts" | "ingredients" | "movements" | "purchases" | "usage" | "audits" | "suppliers"
+  >(lowStockItems.length > 0 ? "alerts" : "ingredients")
 
   // Modals
   const [showAddIngModal, setShowAddIngModal] = React.useState(false)
@@ -129,26 +137,6 @@ export function AdminInventoryManager({
         >
           Ingredients Stock ({ingredients.length})
         </button>
-        <button
-          onClick={() => setActiveTab("movements")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-            activeTab === "movements"
-              ? "bg-[#43291F] text-white"
-              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
-          }`}
-        >
-          Stock Movements Log ({initialMovements.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("suppliers")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-            activeTab === "suppliers"
-              ? "bg-[#43291F] text-white"
-              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
-          }`}
-        >
-          Suppliers Directory ({suppliers.length})
-        </button>
 
         <button
           onClick={() => setActiveTab("purchases")}
@@ -159,7 +147,52 @@ export function AdminInventoryManager({
           }`}
         >
           <ShoppingCart className="w-3.5 h-3.5" />
-          Purchase History ({purchaseHistory.length})
+          Stock Inward Verification ({purchaseHistory.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("usage")}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === "usage"
+              ? "bg-[#43291F] text-white"
+              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
+          }`}
+        >
+          <Scale className="w-3.5 h-3.5" />
+          Material Usage & Analysis ({usageLogs.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("audits")}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
+            activeTab === "audits"
+              ? "bg-[#43291F] text-white"
+              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
+          }`}
+        >
+          <ClipboardCheck className="w-3.5 h-3.5" />
+          Stock Audits & Missing Items ({audits.length})
+        </button>
+
+        <button
+          onClick={() => setActiveTab("movements")}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+            activeTab === "movements"
+              ? "bg-[#43291F] text-white"
+              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
+          }`}
+        >
+          Movements Log ({initialMovements.length})
+        </button>
+        <button
+          onClick={() => setActiveTab("suppliers")}
+          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
+            activeTab === "suppliers"
+              ? "bg-[#43291F] text-white"
+              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
+          }`}
+        >
+          Suppliers ({suppliers.length})
         </button>
       </div>
 
@@ -439,61 +472,108 @@ export function AdminInventoryManager({
         </Card>
       )}
 
-      {/* ── TAB 4: PURCHASE HISTORY (Admin cross-verify) ── */}
+      {/* ── TAB 4: PURCHASE INWARDS & VERIFICATION (Admin cross-verify) ── */}
       {activeTab === "purchases" && (
         <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-          <div className="p-3 border-b border-[#E8DED0]">
-            <p className="text-xs font-bold text-[#43291F]">Stock Purchase History</p>
-            <p className="text-[11px] text-[#705B51] mt-0.5">
-              All stock received by managers — cross-verify quantities, costs, and suppliers
-            </p>
+          <div className="p-4 border-b border-[#E8DED0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-bold font-serif text-[#43291F]">
+                Stock Inward Verification & Discrepancy Log
+              </p>
+              <p className="text-xs text-[#705B51] mt-0.5">
+                Cross-verify supplier bills against physical stock counted at the store. Missing items or supplier short-deliveries are flagged.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-[#705B51]">
+                Total Deliveries: {purchaseHistory.length}
+              </span>
+            </div>
           </div>
+
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
                 <tr>
-                  <th className="py-3 px-4">Date</th>
-                  <th className="py-3 px-4">Supplier</th>
-                  <th className="py-3 px-4">Items Received</th>
-                  <th className="py-3 px-4">Total Cost</th>
-                  <th className="py-3 px-4">Reference No.</th>
-                  <th className="py-3 px-4 text-right">Notes</th>
+                  <th className="py-3 px-4">Date & Time</th>
+                  <th className="py-3 px-4">Supplier & Bill No.</th>
+                  <th className="py-3 px-4">Items: Billed vs Physical Received</th>
+                  <th className="py-3 px-4">Physical Total</th>
+                  <th className="py-3 px-4 text-center">Verification Status</th>
+                  <th className="py-3 px-4 text-right">Delivery Notes</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-[#E8DED0]">
-                {purchaseHistory.map((po) => (
-                  <tr key={po.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
-                    <td className="py-3 px-4 text-[#705B51]">{formatDateTime(po.created_at)}</td>
-                    <td className="py-3 px-4 font-bold text-[#43291F]">
-                      {po.suppliers?.name || "Direct Purchase"}
-                      {po.suppliers?.phone && (
-                        <span className="block font-mono text-[10px] text-[#A09289]">{po.suppliers.phone}</span>
-                      )}
-                    </td>
-                    <td className="py-3 px-4">
-                      <div className="space-y-0.5">
-                        {po.purchase_items?.map((pi: any) => (
-                          <div key={pi.id} className="text-[11px]">
-                            <span className="font-semibold text-[#43291F]">{pi.ingredients?.name}</span>
-                            <span className="text-[#705B51] ml-1">
-                              × {pi.quantity} {pi.ingredients?.unit}
-                              {pi.unit_cost > 0 && <span className="ml-1 text-[#A09289]">@ ₹{pi.unit_cost}/{pi.ingredients?.unit}</span>}
-                            </span>
-                          </div>
-                        ))}
-                      </div>
-                    </td>
-                    <td className="py-3 px-4 font-bold font-serif text-[#43291F]">
-                      {po.total_cost > 0 ? `₹${Number(po.total_cost).toFixed(2)}` : "—"}
-                    </td>
-                    <td className="py-3 px-4 font-mono text-[#705B51]">
-                      {po.reference_no || "—"}
-                    </td>
-                    <td className="py-3 px-4 text-right text-[#A09289]">
-                      {po.notes || "—"}
-                    </td>
-                  </tr>
-                ))}
+                {purchaseHistory.map((po) => {
+                  const hasDisc = po.has_discrepancy || po.purchase_items?.some((pi: any) => (pi.discrepancy_quantity && Number(pi.discrepancy_quantity) < -0.001))
+                  return (
+                    <tr key={po.id} className={`hover:bg-[#F8F3E9]/50 transition-colors ${hasDisc ? "bg-red-50/30" : ""}`}>
+                      <td className="py-3 px-4 text-[#705B51] whitespace-nowrap">
+                        {formatDateTime(po.created_at)}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-[#43291F]">
+                        {po.suppliers?.name || "Direct Purchase"}
+                        <span className="block font-mono text-[10px] text-[#705B51]">
+                          Ref: {po.reference_no || "No Bill #"}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        <div className="space-y-1.5 py-1">
+                          {po.purchase_items?.map((pi: any) => {
+                            const pQty = pi.quantity_purchased ?? pi.quantity
+                            const rQty = pi.quantity_received ?? pi.quantity
+                            const diff = Number(rQty) - Number(pQty)
+                            const isMissing = diff < -0.001
+
+                            return (
+                              <div key={pi.id} className="text-[11px]">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-semibold text-[#43291F]">{pi.ingredients?.name}</span>
+                                  <span className="text-[#705B51]">
+                                    (Billed: {pQty} {pi.ingredients?.unit} &bull; Physical: {rQty} {pi.ingredients?.unit})
+                                  </span>
+                                  {isMissing ? (
+                                    <Badge variant="destructive" className="text-[9px] px-1.5 py-0">
+                                      {diff.toFixed(2)} {pi.ingredients?.unit} Missing
+                                    </Badge>
+                                  ) : (
+                                    <Badge variant="olive" className="text-[9px] px-1.5 py-0">
+                                      Matched
+                                    </Badge>
+                                  )}
+                                </div>
+                                {pi.discrepancy_reason && (
+                                  <span className="text-[10px] text-red-600 block pl-1 italic">
+                                    Reason: &quot;{pi.discrepancy_reason}&quot;
+                                  </span>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </td>
+                      <td className="py-3 px-4 font-bold font-serif text-[#43291F] whitespace-nowrap">
+                        {po.total_cost > 0 ? formatCurrency(po.total_cost) : "—"}
+                      </td>
+                      <td className="py-3 px-4 text-center">
+                        {hasDisc ? (
+                          <Badge variant="destructive" className="text-[10px] gap-1 inline-flex items-center">
+                            <AlertTriangle className="w-3 h-3" />
+                            Missing Stock Flagged
+                          </Badge>
+                        ) : (
+                          <Badge variant="olive" className="text-[10px] gap-1 inline-flex items-center">
+                            <CheckCircle2 className="w-3 h-3" />
+                            Verified & Matched
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-right text-[#A09289] text-[11px]">
+                        {po.notes || "—"}
+                      </td>
+                    </tr>
+                  )
+                })}
               </tbody>
             </table>
           </div>
@@ -503,7 +583,211 @@ export function AdminInventoryManager({
               <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-40" />
               <p className="font-serif font-bold text-base text-[#43291F]">No Purchase Records Yet</p>
               <p className="text-xs text-[#705B51] mt-1">
-                Stock inward receipts submitted by the manager will appear here for admin review.
+                Stock inward receipts submitted by the store manager will appear here for admin cross-verification.
+              </p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── TAB 5: MATERIAL USAGE & ANOMALY ANALYSIS ── */}
+      {activeTab === "usage" && (
+        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-[#E8DED0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-bold font-serif text-[#43291F]">
+                Raw Material Consumption & Average Usage Analysis
+              </p>
+              <p className="text-xs text-[#705B51] mt-0.5">
+                Automatically monitors store raw material consumption against product sales recipes to detect over-portioning or spillage.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-[#705B51]">
+                Total Reports: {usageLogs.length}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
+                <tr>
+                  <th className="py-3 px-4">Date & Time</th>
+                  <th className="py-3 px-4">Raw Ingredient</th>
+                  <th className="py-3 px-4">Reported Usage</th>
+                  <th className="py-3 px-4">Sales Benchmark</th>
+                  <th className="py-3 px-4">Variance (%)</th>
+                  <th className="py-3 px-4">Consumption Status</th>
+                  <th className="py-3 px-4">Manager Explanation</th>
+                  <th className="py-3 px-4 text-right">Reported By</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8DED0]">
+                {usageLogs.map((log) => {
+                  const isHigh = log.status === "high_variance"
+                  const isLow = log.status === "low_variance"
+
+                  return (
+                    <tr
+                      key={log.id}
+                      className={`hover:bg-[#F8F3E9]/50 transition-colors ${
+                        isHigh ? "bg-red-50/40" : isLow ? "bg-amber-50/30" : ""
+                      }`}
+                    >
+                      <td className="py-3 px-4 text-[#705B51] whitespace-nowrap">
+                        {formatDateTime(log.created_at)}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-[#43291F]">
+                        {log.ingredients?.name}
+                      </td>
+                      <td className="py-3 px-4 font-mono font-bold text-[#43291F]">
+                        {log.reported_usage} {log.ingredients?.unit}
+                      </td>
+                      <td className="py-3 px-4 text-[#705B51]">
+                        {log.expected_usage} {log.ingredients?.unit}
+                      </td>
+                      <td className="py-3 px-4 font-bold">
+                        <span
+                          className={
+                            isHigh ? "text-red-700" : isLow ? "text-amber-700" : "text-emerald-700"
+                          }
+                        >
+                          {log.variance_percent > 0 ? `+${log.variance_percent}%` : `${log.variance_percent}%`}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4">
+                        {isHigh && (
+                          <Badge variant="destructive" className="text-[10px] gap-1 inline-flex items-center">
+                            <AlertTriangle className="w-3 h-3" /> High Variance Alert
+                          </Badge>
+                        )}
+                        {isLow && (
+                          <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-800">
+                            Below Average
+                          </Badge>
+                        )}
+                        {!isHigh && !isLow && (
+                          <Badge variant="olive" className="text-[10px] gap-1 inline-flex items-center">
+                            <CheckCircle2 className="w-3 h-3" /> Normal Range
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 text-[#705B51]">
+                        {log.notes || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-right font-medium text-[#43291F]">
+                        {log.profiles?.full_name || "Manager"}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {usageLogs.length === 0 && (
+            <div className="py-14 text-center text-[#A09289]">
+              <Scale className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="font-serif font-bold text-base text-[#43291F]">No Material Usage Logs</p>
+              <p className="text-xs text-[#705B51] mt-1">
+                When store managers log daily raw material consumption, average analysis will appear here.
+              </p>
+            </div>
+          )}
+        </Card>
+      )}
+
+      {/* ── TAB 6: PHYSICAL STOCK AUDITS & MISSING ITEMS ── */}
+      {activeTab === "audits" && (
+        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
+          <div className="p-4 border-b border-[#E8DED0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-bold font-serif text-[#43291F]">
+                Physical Inventory Audits & Shrinkage Verification
+              </p>
+              <p className="text-xs text-[#705B51] mt-0.5">
+                Physical store stock audits submitted by managers. Cross-checked with system inventory to catch shrinkage or missing items.
+              </p>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[11px] font-semibold text-[#705B51]">
+                Total Audits: {audits.length}
+              </span>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
+                <tr>
+                  <th className="py-3 px-4">Audit Date</th>
+                  <th className="py-3 px-4">Audited By</th>
+                  <th className="py-3 px-4">Items Audited</th>
+                  <th className="py-3 px-4">Missing Items Detected</th>
+                  <th className="py-3 px-4">Estimated Loss Value</th>
+                  <th className="py-3 px-4">Audit Status</th>
+                  <th className="py-3 px-4 text-right">Manager Remarks</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8DED0]">
+                {audits.map((a) => {
+                  const hasMissing = Number(a.missing_items_count) > 0
+                  return (
+                    <tr
+                      key={a.id}
+                      className={`hover:bg-[#F8F3E9]/50 transition-colors ${
+                        hasMissing ? "bg-red-50/40" : ""
+                      }`}
+                    >
+                      <td className="py-3 px-4 text-[#705B51] whitespace-nowrap">
+                        {formatDateTime(a.created_at)}
+                      </td>
+                      <td className="py-3 px-4 font-bold text-[#43291F]">
+                        {a.profiles?.full_name || "Manager"}
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-[#705B51]">
+                        {a.total_items_audited} items
+                      </td>
+                      <td className="py-3 px-4">
+                        {hasMissing ? (
+                          <Badge variant="destructive" className="text-[10px] gap-1 inline-flex items-center font-bold">
+                            <AlertTriangle className="w-3 h-3" />
+                            {a.missing_items_count} Missing Items
+                          </Badge>
+                        ) : (
+                          <Badge variant="olive" className="text-[10px] gap-1 inline-flex items-center">
+                            <CheckCircle2 className="w-3 h-3" /> All Stock Intact
+                          </Badge>
+                        )}
+                      </td>
+                      <td className="py-3 px-4 font-bold font-serif text-red-600">
+                        {Number(a.total_loss_value) > 0 ? formatCurrency(a.total_loss_value) : "₹0.00"}
+                      </td>
+                      <td className="py-3 px-4">
+                        <Badge
+                          variant={a.status === "reconciled" ? "olive" : "secondary"}
+                          className="capitalize text-[10px]"
+                        >
+                          {a.status.replace("_", " ")}
+                        </Badge>
+                      </td>
+                      <td className="py-3 px-4 text-right text-[#705B51] text-[11px]">
+                        {a.notes || "—"}
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+
+          {audits.length === 0 && (
+            <div className="py-14 text-center text-[#A09289]">
+              <ClipboardCheck className="w-8 h-8 mx-auto mb-2 opacity-40" />
+              <p className="font-serif font-bold text-base text-[#43291F]">No Physical Audits Recorded</p>
+              <p className="text-xs text-[#705B51] mt-1">
+                When store managers perform physical inventory counts via POS, audit records and missing item comparisons will appear here.
               </p>
             </div>
           )}

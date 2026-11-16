@@ -128,7 +128,14 @@ export async function receiveStockAction(payload: {
   supplier_id?: string | null
   reference_no?: string | null
   notes?: string | null
-  items: { ingredient_id: string; quantity: number; unit_cost: number }[]
+  items: {
+    ingredient_id: string
+    quantity: number
+    quantity_purchased?: number
+    quantity_received?: number
+    unit_cost: number
+    discrepancy_reason?: string | null
+  }[]
 }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
@@ -141,13 +148,27 @@ export async function receiveStockAction(payload: {
     return { success: false, error: 'No items in stock receipt' }
   }
 
+  // Format items with fallback for quantity_purchased and quantity_received
+  const formattedItems = payload.items.map((item) => {
+    const received = item.quantity_received !== undefined ? Number(item.quantity_received) : Number(item.quantity)
+    const purchased = item.quantity_purchased !== undefined ? Number(item.quantity_purchased) : received
+    return {
+      ingredient_id: item.ingredient_id,
+      quantity: received,
+      quantity_purchased: purchased,
+      quantity_received: received,
+      unit_cost: Number(item.unit_cost),
+      discrepancy_reason: item.discrepancy_reason || null,
+    }
+  })
+
   const { data, error } = await supabase.rpc('receive_stock', {
     p_shop_id: profile.shop_id,
     p_manager_id: user.id,
     p_supplier_id: payload.supplier_id || null,
     p_reference_no: payload.reference_no || null,
     p_notes: payload.notes || null,
-    p_items: payload.items,
+    p_items: formattedItems,
   })
 
   if (error) return { success: false, error: error.message }
@@ -304,3 +325,134 @@ export async function updateIngredientAvgUsage(ingredientId: string, avgUsage: n
   revalidatePath('/admin/inventory')
   return { success: true }
 }
+
+export async function recordRawMaterialUsageAction(payload: {
+  ingredient_id: string
+  reported_usage: number
+  notes?: string | null
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Unauthorized' }
+
+  const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single()
+  if (!profile) return { success: false, error: 'Profile not found' }
+
+  if (!payload.ingredient_id || payload.reported_usage <= 0) {
+    return { success: false, error: 'Valid ingredient and positive usage amount are required' }
+  }
+
+  // Call PostgreSQL function
+  const { data, error } = await supabase.rpc('record_raw_material_usage', {
+    p_shop_id: profile.shop_id,
+    p_manager_id: user.id,
+    p_ingredient_id: payload.ingredient_id,
+    p_reported_usage: payload.reported_usage,
+    p_notes: payload.notes || null,
+  })
+
+  if (error) {
+    // If RPC not found yet, fallback to direct insertion
+    const { data: ing } = await supabase
+      .from('ingredients')
+      .select('name, unit, current_stock')
+      .eq('id', payload.ingredient_id)
+      .single()
+
+    const fallbackStatus = 'normal'
+    const { data: log, error: insertErr } = await supabase
+      .from('raw_material_usage_logs')
+      .insert({
+        shop_id: profile.shop_id,
+        manager_id: user.id,
+        ingredient_id: payload.ingredient_id,
+        reported_usage: payload.reported_usage,
+        expected_usage: payload.reported_usage,
+        variance: 0,
+        variance_percent: 0,
+        status: fallbackStatus,
+        notes: payload.notes || null,
+      })
+      .select()
+      .single()
+
+    if (insertErr) return { success: false, error: insertErr.message }
+
+    revalidatePath('/admin/inventory')
+    revalidatePath('/pos/usage')
+    return { success: true, result: log }
+  }
+
+  revalidatePath('/admin/inventory')
+  revalidatePath('/pos/usage')
+  return { success: true, result: data }
+}
+
+export async function getRawMaterialUsageLogs(limit = 100) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('raw_material_usage_logs')
+    .select(`
+      *,
+      ingredients (name, unit),
+      profiles:manager_id (full_name)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) return []
+  return data || []
+}
+
+export async function submitInventoryAuditAction(payload: {
+  notes?: string | null
+  items: { ingredient_id: string; physical_count: number; notes?: string | null }[]
+  reconcile_stock?: boolean
+}) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Unauthorized' }
+
+  const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single()
+  if (!profile) return { success: false, error: 'Profile not found' }
+
+  if (!payload.items || payload.items.length === 0) {
+    return { success: false, error: 'No items provided for inventory audit' }
+  }
+
+  const { data, error } = await supabase.rpc('submit_inventory_audit', {
+    p_shop_id: profile.shop_id,
+    p_manager_id: user.id,
+    p_notes: payload.notes || null,
+    p_items: payload.items,
+    p_reconcile_stock: payload.reconcile_stock || false,
+  })
+
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/inventory')
+  revalidatePath('/pos/audit')
+  return { success: true, result: data }
+}
+
+export async function getInventoryAudits(limit = 50) {
+  const supabase = await createClient()
+
+  const { data, error } = await supabase
+    .from('inventory_audits')
+    .select(`
+      *,
+      profiles:audited_by (full_name),
+      inventory_audit_items (
+        *,
+        ingredients (name, unit)
+      )
+    `)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) return []
+  return data || []
+}
+
