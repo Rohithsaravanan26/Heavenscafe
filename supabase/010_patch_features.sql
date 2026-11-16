@@ -5,8 +5,106 @@
 -- https://supabase.com/dashboard/project/pxadovlmslbszctwxdzl/sql
 -- ============================================================
 
--- ── 1. DEDUPLICATE MENU CATEGORIES ───────────────────────────
--- Keep the OLDEST row per (shop_id, name), delete duplicates
+-- ── 1. DEDUPLICATE PRODUCTS & REASSIGN FOREIGN KEYS ──────────
+-- First, reassign any references from duplicate products to the original (oldest) product
+WITH ranked_products AS (
+  SELECT id,
+         shop_id,
+         name,
+         FIRST_VALUE(id) OVER (
+           PARTITION BY shop_id, name
+           ORDER BY created_at ASC
+         ) AS keep_id,
+         ROW_NUMBER() OVER (
+           PARTITION BY shop_id, name
+           ORDER BY created_at ASC
+         ) AS rn
+  FROM products
+),
+dup_products AS (
+  SELECT id AS dup_id, keep_id
+  FROM ranked_products
+  WHERE rn > 1
+)
+UPDATE sale_items si
+SET product_id = dp.keep_id
+FROM dup_products dp
+WHERE si.product_id = dp.dup_id;
+
+-- Reassign recipes if any point to duplicates
+WITH ranked_products AS (
+  SELECT id,
+         shop_id,
+         name,
+         FIRST_VALUE(id) OVER (
+           PARTITION BY shop_id, name
+           ORDER BY created_at ASC
+         ) AS keep_id,
+         ROW_NUMBER() OVER (
+           PARTITION BY shop_id, name
+           ORDER BY created_at ASC
+         ) AS rn
+  FROM products
+),
+dup_products AS (
+  SELECT id AS dup_id, keep_id
+  FROM ranked_products
+  WHERE rn > 1
+)
+DELETE FROM recipes
+WHERE product_id IN (SELECT dup_id FROM dup_products);
+
+-- Delete duplicate products
+WITH ranked_products AS (
+  SELECT id,
+         ROW_NUMBER() OVER (
+           PARTITION BY shop_id, name
+           ORDER BY created_at ASC
+         ) AS rn
+  FROM products
+)
+DELETE FROM products
+WHERE id IN (
+  SELECT id FROM ranked_products WHERE rn > 1
+);
+
+-- Ensure products cannot be duplicated in the future
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_constraint WHERE conname = 'uq_products_shop_name'
+  ) THEN
+    ALTER TABLE products ADD CONSTRAINT uq_products_shop_name UNIQUE (shop_id, name);
+  END IF;
+END $$;
+
+-- ── 2. DEDUPLICATE MENU CATEGORIES ───────────────────────────
+-- Reassign any products referencing duplicate categories
+WITH ranked_categories AS (
+  SELECT id,
+         shop_id,
+         name,
+         FIRST_VALUE(id) OVER (
+           PARTITION BY shop_id, name
+           ORDER BY created_at ASC
+         ) AS keep_id,
+         ROW_NUMBER() OVER (
+           PARTITION BY shop_id, name
+           ORDER BY created_at ASC
+         ) AS rn
+  FROM menu_categories
+),
+dup_cats AS (
+  SELECT id AS dup_id, keep_id
+  FROM ranked_categories
+  WHERE rn > 1
+)
+UPDATE products p
+SET category_id = dc.keep_id
+FROM dup_cats dc
+WHERE p.category_id = dc.dup_id;
+
+-- Delete duplicate categories
 WITH ranked_categories AS (
   SELECT id,
          ROW_NUMBER() OVER (
@@ -19,24 +117,6 @@ DELETE FROM menu_categories
 WHERE id IN (
   SELECT id FROM ranked_categories WHERE rn > 1
 );
-
--- ── 2. DEDUPLICATE PRODUCTS ──────────────────────────────────
--- Keep the OLDEST row per (shop_id, category_id, name), delete duplicates
--- First remove any sale_items references to duplicate products
--- (safe because only the duplicate IDs are deleted, oldest is kept)
-WITH ranked_products AS (
-  SELECT id,
-         ROW_NUMBER() OVER (
-           PARTITION BY shop_id, category_id, name
-           ORDER BY created_at ASC
-         ) AS rn
-  FROM products
-),
-dup_ids AS (
-  SELECT id FROM ranked_products WHERE rn > 1
-)
-DELETE FROM products
-WHERE id IN (SELECT id FROM dup_ids);
 
 -- ── 3. ADD avg_usage_per_sale TO recipe_items ─────────────────
 ALTER TABLE recipe_items
