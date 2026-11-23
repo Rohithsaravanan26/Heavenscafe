@@ -51,11 +51,11 @@ export function AdminReportsView({
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
         <div>
-          <h1 className="font-serif text-3xl font-bold text-[#43291F]">
+          <h1 className="font-serif text-fluid-h1 font-bold text-[#43291F]">
             Commercial Reports &amp; P&amp;L Statement
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
@@ -63,12 +63,12 @@ export function AdminReportsView({
           </p>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
           {/* Period Filter Switcher */}
           <div className="flex bg-[#EFE7DA] p-1 rounded-lg border border-[#E8DED0]">
             <button
               onClick={() => setPeriod("today")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer min-h-[36px] touch-manipulation ${
                 isToday ? "bg-[#43291F] text-white shadow-xs" : "text-[#705B51] hover:text-[#43291F]"
               }`}
             >
@@ -76,7 +76,7 @@ export function AdminReportsView({
             </button>
             <button
               onClick={() => setPeriod("month")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer min-h-[36px] touch-manipulation ${
                 !isToday ? "bg-[#43291F] text-white shadow-xs" : "text-[#705B51] hover:text-[#43291F]"
               }`}
             >
@@ -87,7 +87,7 @@ export function AdminReportsView({
           <Button
             size="sm"
             onClick={handlePrint}
-            className="text-xs bg-[#43291F] hover:bg-[#341F17] text-white"
+            className="text-xs bg-[#43291F] hover:bg-[#341F17] text-white min-h-[36px] touch-manipulation"
           >
             <Printer className="w-3.5 h-3.5 mr-1" />
             Print Statement
@@ -96,7 +96,7 @@ export function AdminReportsView({
       </div>
 
       {/* 4 Core Highlight Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
           <span className="text-[10px] font-bold uppercase tracking-wider text-[#737B52]">
             {isToday ? "Today's Gross Sales" : "Monthly Gross Sales"}

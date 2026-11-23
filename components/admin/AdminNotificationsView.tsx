@@ -38,14 +38,14 @@ export function AdminNotificationsView({ initialNotifications }: AdminNotificati
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+    <div className="space-y-6 max-w-4xl mx-auto w-full min-w-0">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
         <div>
-          <h1 className="font-serif text-3xl font-bold text-[#43291F]">
-            Notifications & System Alerts
+          <h1 className="font-serif text-fluid-h1 font-bold text-[#43291F]">
+            Notifications &amp; System Alerts
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
-            Automatic alerts for low raw material stock, cash discrepancies & daily closing events
+            Automatic alerts for low raw material stock, cash discrepancies &amp; daily closing events
           </p>
         </div>
 
@@ -55,7 +55,7 @@ export function AdminNotificationsView({ initialNotifications }: AdminNotificati
             variant="outline"
             onClick={handleMarkAllRead}
             disabled={loading}
-            className="text-xs border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F]"
+            className="text-xs border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F] min-h-[36px] touch-manipulation"
           >
             <CheckCheck className="w-3.5 h-3.5 mr-1 text-[#737B52]" />
             Mark All as Read
@@ -73,9 +73,9 @@ export function AdminNotificationsView({ initialNotifications }: AdminNotificati
                 : "bg-[#FAF0EB] border-[#F3DDD2]"
             }`}
           >
-            <div className="p-4 flex items-start justify-between gap-4">
+            <div className="p-3.5 sm:p-4 flex flex-col sm:flex-row items-start justify-between gap-3 sm:gap-4">
               <div className="flex items-start gap-3">
-                <div className="mt-0.5">
+                <div className="mt-0.5 shrink-0">
                   {n.type === "out_of_stock" || n.type === "critical_stock" ? (
                     <AlertCircle className="w-5 h-5 text-red-600" />
                   ) : n.type === "discrepancy" ? (
@@ -91,7 +91,7 @@ export function AdminNotificationsView({ initialNotifications }: AdminNotificati
                       {n.title}
                     </h4>
                     {!n.is_read && (
-                      <span className="w-2 h-2 rounded-full bg-[#B56C4A]" />
+                      <span className="w-2 h-2 rounded-full bg-[#B56C4A] shrink-0" />
                     )}
                   </div>
                   <p className="text-xs text-[#705B51] mt-1">{n.message}</p>
@@ -105,7 +105,7 @@ export function AdminNotificationsView({ initialNotifications }: AdminNotificati
                 <button
                   onClick={() => handleMarkRead(n.id)}
                   title="Mark as read"
-                  className="text-xs text-[#737B52] hover:text-[#43291F] font-semibold whitespace-nowrap px-2.5 py-1 rounded hover:bg-white border border-[#E8DED0]"
+                  className="text-xs text-[#737B52] hover:text-[#43291F] font-semibold whitespace-nowrap px-3 py-1.5 rounded-lg hover:bg-white border border-[#E8DED0] min-h-[36px] self-end sm:self-start touch-manipulation"
                 >
                   Mark Read
                 </button>

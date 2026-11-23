@@ -88,11 +88,11 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
         <div>
-          <h1 className="font-serif text-3xl font-bold text-[#43291F]">
+          <h1 className="font-serif text-fluid-h1 font-bold text-[#43291F]">
             Operational Expenses Audit
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
@@ -103,7 +103,7 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
         <Button
           size="sm"
           onClick={() => setShowAddModal(true)}
-          className="text-xs bg-[#43291F] hover:bg-[#341F17] text-white"
+          className="text-xs bg-[#43291F] hover:bg-[#341F17] text-white min-h-[36px] touch-manipulation"
         >
           <Plus className="w-3.5 h-3.5 mr-1" />
           Record Owner Overhead
@@ -117,7 +117,7 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
       )}
 
       {/* Expense KPI summary cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
           <span className="text-[10px] uppercase font-bold text-[#705B51] block">Total Logged Expenses</span>
           <span className="font-serif text-2xl font-bold text-[#43291F] block mt-1 font-mono">
@@ -164,7 +164,7 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
             <Select
               value={selectedSource}
               onChange={(e) => setSelectedSource(e.target.value)}
-              className="h-9 text-xs min-w-[150px]"
+              className="h-9 text-xs min-w-[150px] w-full sm:w-auto"
             >
               <option value="all">All Sources (Cash &amp; UPI)</option>
               <option value="cash_drawer">Cash Drawer Only (Petty Cash)</option>
@@ -174,7 +174,7 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
             <Select
               value={selectedCategory}
               onChange={(e) => setSelectedCategory(e.target.value)}
-              className="h-9 text-xs min-w-[170px]"
+              className="h-9 text-xs min-w-[170px] w-full sm:w-auto"
             >
               <option value="all">All Categories</option>
               {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
@@ -187,9 +187,60 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
         </div>
       </Card>
 
-      {/* Expenses List Table */}
-      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Expenses List Table / Mobile Cards */}
+      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden min-w-0">
+        {/* Mobile Card List (< md) */}
+        <div className="block md:hidden divide-y divide-[#E8DED0]">
+          {filteredExpenses.map((exp) => {
+            const isCash = (exp.payment_source || "cash_drawer") === "cash_drawer"
+
+            return (
+              <div key={exp.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-bold text-sm text-[#43291F]">{exp.description}</h4>
+                    <p className="text-[11px] text-[#705B51] mt-0.5">
+                      {formatDate(exp.expense_date)} • {exp.profiles?.full_name || "Manager"}
+                    </p>
+                  </div>
+                  <span className="font-serif font-black text-sm text-red-700 font-mono shrink-0">
+                    -{formatCurrency(exp.amount)}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <Badge variant="outline" className="text-[10px] capitalize">
+                      {CATEGORY_LABELS[exp.category] || exp.category}
+                    </Badge>
+                    <span
+                      className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                        isCash ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"
+                      }`}
+                    >
+                      {isCash ? "Cash Drawer" : "Owner / UPI"}
+                    </span>
+                    {exp.reference && (
+                      <span className="text-[10px] text-[#A09289] font-mono">Ref: {exp.reference}</span>
+                    )}
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleDelete(exp.id)}
+                    title="Delete Record"
+                    className="text-[#A09289] hover:text-red-700 p-2 rounded-lg hover:bg-red-50 touch-manipulation min-h-[32px] min-w-[32px] flex items-center justify-center"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Desktop Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
               <tr>
@@ -258,7 +309,7 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
         </div>
 
         {filteredExpenses.length === 0 && (
-          <div className="py-14 text-center text-[#A09289]">
+          <div className="py-14 text-center text-[#A09289] px-4">
             <Wallet className="w-8 h-8 mx-auto mb-2 opacity-40 text-[#737B52]" />
             <p className="font-serif font-bold text-base text-[#43291F]">No Expenses Found</p>
             <p className="text-xs text-[#705B51] mt-1">
@@ -270,7 +321,7 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
 
       {/* ── ADD EXPENSE MODAL (Remote Owner Entry for Overheads) ── */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Record Owner / Overhead Expense</DialogTitle>
           </DialogHeader>
@@ -281,9 +332,12 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
               const res = await addExpenseAction(formData)
               setLoading(false)
               if (res.success && res.expense) {
-                setExpenses((prev) => [res.expense, ...prev])
+                setExpenses((prev) => [
+                  { ...res.expense, profiles: { full_name: "Owner (Admin)" } },
+                  ...prev,
+                ])
                 setShowAddModal(false)
-                setStatusMsg({ type: "success", text: "Expense recorded successfully." })
+                setStatusMsg({ type: "success", text: `Recorded ₹${res.expense.amount} expense.` })
               } else {
                 setStatusMsg({ type: "error", text: res.error || "Failed to record expense" })
               }
@@ -291,83 +345,58 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
             className="space-y-4 pt-2"
           >
             <div className="space-y-1.5">
-              <Label htmlFor="category">Expense Category *</Label>
+              <Label htmlFor="category">Category *</Label>
               <Select id="category" name="category" required>
-                <option value="rent">🏠 Shop Rent &amp; Maintenance</option>
-                <option value="electricity">⚡ Electricity Power Bill</option>
-                <option value="gas">🔥 LPG Commercial Gas Cylinders</option>
-                <option value="salary">👥 Staff Monthly Salaries / Wages</option>
-                <option value="packaging">📦 Bulk Packaging Materials</option>
-                <option value="water">💧 Drinking Water Supply</option>
-                <option value="maintenance">🛠️ Equipment Repairs &amp; Upkeep</option>
-                <option value="ingredients">🍵 Bulk Ingredients Purchase</option>
-                <option value="other">📋 Other Store Overhead</option>
+                {Object.entries(CATEGORY_LABELS).map(([val, label]) => (
+                  <option key={val} value={val}>
+                    {label}
+                  </option>
+                ))}
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="description">Description / Narrative *</Label>
+              <Label htmlFor="desc">Description *</Label>
               <Input
-                id="description"
+                id="desc"
                 name="description"
-                placeholder="e.g. Monthly Shop Rent Paid to Landlord"
+                placeholder="e.g. November Shop Rent or Electricity bill"
                 required
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label htmlFor="amount">Amount in INR (₹) *</Label>
-                <Input
-                  id="amount"
-                  name="amount"
-                  type="number"
-                  step="0.01"
-                  min="0.01"
-                  placeholder="2500.00"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="expense_date">Date of Expense</Label>
-                <Input
-                  id="expense_date"
-                  name="expense_date"
-                  type="date"
-                  defaultValue={new Date().toISOString().split("T")[0]}
-                  required
-                />
-              </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="amount">Amount (₹) *</Label>
+              <Input
+                id="amount"
+                name="amount"
+                type="number"
+                step="0.01"
+                min="0.01"
+                placeholder="5000.00"
+                required
+              />
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="payment_source">Payment Source</Label>
-              <Select id="payment_source" name="payment_source" defaultValue="owner_paid">
-                <option value="owner_paid">Owner Bank / Direct Transfer</option>
-                <option value="online_upi">Owner UPI / GPay</option>
-                <option value="cash_drawer">Cash Drawer (Petty Cash)</option>
+              <Label htmlFor="payment_source">Payment Method *</Label>
+              <Select id="payment_source" name="payment_source" defaultValue="online_upi" required>
+                <option value="online_upi">Direct Owner UPI / Bank Payout</option>
+                <option value="cash_drawer">Cash Drawer Petty Payout</option>
               </Select>
             </div>
 
             <div className="space-y-1.5">
-              <Label htmlFor="reference">Voucher / Receipt / UPI Ref</Label>
-              <Input id="reference" name="reference" placeholder="e.g. UPI-9281726" />
+              <Label htmlFor="ref">Bill / Txn Reference (Optional)</Label>
+              <Input id="ref" name="reference" placeholder="e.g. EB Bill Ref #88921" />
             </div>
 
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold flex items-center justify-center gap-2"
+              className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold"
             >
-              {loading ? (
-                <>
-                  <Loader2 className="w-4 h-4 animate-spin text-[#FAF0EB]" />
-                  <span>Recording...</span>
-                </>
-              ) : (
-                "Save Expense Record"
-              )}
+              {loading ? "Recording Overhead..." : "Submit Expense"}
             </Button>
           </form>
         </DialogContent>

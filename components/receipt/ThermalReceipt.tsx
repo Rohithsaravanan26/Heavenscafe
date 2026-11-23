@@ -78,8 +78,8 @@ export function ThermalReceipt({
     <div className="flex flex-col items-center gap-4 w-full">
       {/* On-screen visual preview */}
       <Card
-        className={`bg-white border-2 border-[#E8DED0] shadow-md p-6 font-mono text-xs text-black leading-tight select-all transition-all ${
-          paperWidth === 58 ? "max-w-[280px]" : "max-w-[360px]"
+        className={`bg-white border-2 border-[#E8DED0] shadow-md p-3.5 sm:p-5 font-mono text-xs text-black leading-tight select-all transition-all w-full overflow-x-auto ${
+          paperWidth === 58 ? "max-w-[280px]" : "max-w-[320px] sm:max-w-[360px]"
         }`}
       >
         <pre className="whitespace-pre-wrap font-mono text-[11px] leading-snug">

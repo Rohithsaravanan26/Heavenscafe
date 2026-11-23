@@ -33,7 +33,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-[#F8F3E9]">
+    <div className="min-h-[100dvh] flex flex-col items-center justify-center p-3 sm:p-4 bg-[#F8F3E9]">
       <div className="w-full max-w-md">
         {/* Brand Header */}
         <div className="text-center mb-8">

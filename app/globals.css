@@ -27,17 +27,50 @@
   --radius: 0.5rem;
 }
 
+html {
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+  touch-action: manipulation;
+}
+
 body {
   background-color: var(--background);
   color: var(--foreground);
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
+  min-width: 320px;
+  min-height: 100dvh;
   -webkit-font-smoothing: antialiased;
 }
 
 h1, h2, h3, h4, .font-heading {
   font-family: 'Playfair Display', Georgia, serif;
+}
+
+/* Fluid responsive typography utilities */
+.text-fluid-h1 {
+  font-size: clamp(1.75rem, 1.25rem + 2.5vw, 2.75rem);
+  line-height: 1.15;
+}
+
+.text-fluid-h2 {
+  font-size: clamp(1.5rem, 1.15rem + 1.75vw, 2.25rem);
+  line-height: 1.2;
+}
+
+.text-fluid-h3 {
+  font-size: clamp(1.25rem, 1rem + 1.25vw, 1.75rem);
+  line-height: 1.25;
+}
+
+/* Minimum accessible touch target utility */
+.touch-target {
+  min-height: 44px;
+  min-width: 44px;
 }
 
 /* Custom scrollbars matching cafe theme */

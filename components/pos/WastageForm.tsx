@@ -110,31 +110,31 @@ export function WastageForm({ products, recentWastages = [] }: WastageFormProps)
   }, [logs])
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
+    <div className="max-w-4xl mx-auto space-y-6 w-full min-w-0">
       {/* Title */}
       <div>
-        <h2 className="font-serif text-2xl font-bold text-[#43291F]">
+        <h2 className="font-serif text-fluid-h2 font-bold text-[#43291F]">
           Day-End Product Wastage & Loss Logging
         </h2>
-        <p className="text-xs text-[#705B51]">
+        <p className="text-xs text-[#705B51] mt-0.5">
           Log spoiled, expired, or unsold cafe menu items. Losses are calculated based on manufacturing cost and deducted from the daily P&L.
         </p>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5 sm:gap-6">
         {/* Form Card */}
-        <Card className="md:col-span-2 border-[#E8DED0] bg-[#FFFDF8] shadow-sm">
-          <CardHeader className="border-b border-[#E8DED0] pb-4">
-            <CardTitle className="text-lg text-[#43291F] flex items-center gap-2">
+        <Card className="lg:col-span-2 border-[#E8DED0] bg-[#FFFDF8] shadow-sm">
+          <CardHeader className="border-b border-[#E8DED0] pb-3 sm:pb-4 p-4 sm:p-6">
+            <CardTitle className="text-base sm:text-lg text-[#43291F] flex items-center gap-2">
               <Trash2 className="w-5 h-5 text-red-600" />
               Record Wasted Menu Items
             </CardTitle>
-            <CardDescription>
+            <CardDescription className="text-xs">
               Select the food/drink item wasted, enter the quantity, and choose the reason.
             </CardDescription>
           </CardHeader>
 
-          <CardContent className="p-6">
+          <CardContent className="p-4 sm:p-6">
             {message && (
               <Alert
                 variant={message.type === "success" ? "olive" : "destructive"}

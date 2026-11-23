@@ -364,10 +364,10 @@ export function StockInwardForm({ products: initialProducts, initialInwards }: S
             </Card>
           )}
 
-          {/* Recent Inwards Received Table */}
-          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-            <CardHeader className="p-4 border-b border-[#E8DED0] bg-[#F8F3E9] flex flex-row items-center justify-between">
-              <CardTitle className="font-serif text-base text-[#43291F] flex items-center gap-2">
+          {/* Recent Inwards Received Table & Mobile Cards */}
+          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden min-w-0">
+            <CardHeader className="p-3.5 sm:p-4 border-b border-[#E8DED0] bg-[#F8F3E9] flex flex-row items-center justify-between">
+              <CardTitle className="font-serif text-sm sm:text-base text-[#43291F] flex items-center gap-2">
                 <Clock className="w-4 h-4 text-[#737B52]" />
                 Recent Inward Deliveries Received
               </CardTitle>
@@ -376,7 +376,45 @@ export function StockInwardForm({ products: initialProducts, initialInwards }: S
               </Badge>
             </CardHeader>
 
-            <div className="overflow-x-auto max-h-[500px]">
+            {/* Mobile Card List (< md) */}
+            <div className="block md:hidden divide-y divide-[#E8DED0]">
+              {inwards.map((item) => (
+                <div key={item.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-serif font-bold text-sm text-[#43291F]">
+                        {item.products?.name || "Product"}
+                      </h4>
+                      <p className="text-[11px] text-[#705B51] mt-0.5">
+                        {formatDateTime(item.created_at)}
+                      </p>
+                    </div>
+                    <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-xs shrink-0">
+                      +{item.quantity} units
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                    <span className="text-[#705B51]">
+                      Unit: <span className="font-mono text-[#43291F]">{formatCurrency(item.unit_cost || 0)}</span>
+                    </span>
+                    <span className="font-mono font-bold text-[#43291F]">
+                      Total: {formatCurrency(item.total_cost || 0)}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-[#705B51] bg-[#F8F3E9] p-2 rounded-md">
+                    <span>Vendor: <strong>{item.supplier_name || "Direct Delivery"}</strong></span>
+                    {item.invoice_ref && (
+                      <span className="ml-2 font-mono text-[#A09289]">Ref: {item.invoice_ref}</span>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto max-h-[500px]">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F8F3E9]/50 border-b border-[#E8DED0] font-serif font-bold text-[#43291F] sticky top-0">
                   <tr>
@@ -418,15 +456,15 @@ export function StockInwardForm({ products: initialProducts, initialInwards }: S
                   ))}
                 </tbody>
               </table>
-
-              {inwards.length === 0 && (
-                <div className="py-12 text-center text-[#A09289]">
-                  <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" />
-                  <p className="font-serif font-bold text-sm text-[#43291F]">No Stock Inwards Yet</p>
-                  <p className="text-xs text-[#705B51] mt-0.5">Use the form on the left to receive today&apos;s deliveries.</p>
-                </div>
-              )}
             </div>
+
+            {inwards.length === 0 && (
+              <div className="py-12 text-center text-[#A09289] px-4">
+                <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="font-serif font-bold text-sm text-[#43291F]">No Stock Inwards Yet</p>
+                <p className="text-xs text-[#705B51] mt-0.5">Use the form on the left to receive today&apos;s deliveries.</p>
+              </div>
+            )}
           </Card>
         </div>
       </div>

@@ -237,8 +237,107 @@ export function AdminMenuManager({
       </Card>
 
       {/* Products Table with Selling Price, Manufacturing Cost, Profit & Stock */}
-      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden min-w-0">
+        {/* Mobile Card List (< md) */}
+        <div className="block md:hidden divide-y divide-[#E8DED0]">
+          {filteredProducts.map((prod) => {
+            const sp = Number(prod.base_price) || 0
+            const cp = Number(prod.cost_price) || 0
+            const unitProfit = sp - cp
+            const marginPct = sp > 0 ? ((unitProfit / sp) * 100).toFixed(0) : "0"
+            const stock = Number(prod.current_stock ?? 0)
+            const minStock = Number(prod.min_stock ?? 10)
+            const isLow = stock <= minStock
+
+            return (
+              <div key={prod.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+                <div className="flex items-start justify-between gap-2">
+                  <div>
+                    <h4 className="font-serif font-bold text-sm text-[#43291F]">
+                      {prod.name}
+                      {!prod.is_active && (
+                        <span className="ml-1.5 text-[10px] text-red-600 font-sans font-normal">
+                          (Archived)
+                        </span>
+                      )}
+                    </h4>
+                    <div className="flex items-center gap-1.5 mt-0.5">
+                      <Badge variant="olive" className="text-[10px]">
+                        {prod.menu_categories?.name || "General"}
+                      </Badge>
+                      <span
+                        className={`inline-flex items-center gap-0.5 px-2 py-0.2 rounded-full text-[10px] font-bold ${
+                          isLow ? "bg-red-100 text-red-800" : "bg-[#F0F1EA] text-[#737B52]"
+                        }`}
+                      >
+                        {isLow && <AlertTriangle className="w-2.5 h-2.5 text-red-600" />}
+                        {stock} in stock
+                      </span>
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => handleToggleAvailability(prod.id, prod.is_available)}
+                    className={`px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-colors shrink-0 touch-manipulation min-h-[30px] ${
+                      prod.is_available
+                        ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                        : "bg-red-100 text-red-800 hover:bg-red-200"
+                    }`}
+                  >
+                    {prod.is_available ? "In Stock" : "Unavailable"}
+                  </button>
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                  <div>
+                    <span className="text-[#705B51]">Price: </span>
+                    <strong className="text-[#43291F] font-mono">{formatCurrency(sp)}</strong>
+                    <span className="text-[#A09289] ml-1.5">Cost: {formatCurrency(cp)}</span>
+                  </div>
+                  <span className="font-bold text-emerald-700 font-mono">
+                    +{formatCurrency(unitProfit)} ({marginPct}%)
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-end gap-2 pt-1 border-t border-[#E8DED0]/40">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => openEditModal(prod)}
+                    className="h-8 px-3 text-xs font-semibold border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F] touch-manipulation"
+                  >
+                    <Edit2 className="w-3 h-3 mr-1" />
+                    Edit Price / Cost
+                  </Button>
+
+                  {prod.is_active ? (
+                    <button
+                      type="button"
+                      onClick={() => handleArchive(prod.id)}
+                      title="Archive Product"
+                      className="text-[#A09289] hover:text-red-700 p-2 rounded-lg hover:bg-red-50 touch-manipulation min-h-[32px] min-w-[32px] flex items-center justify-center"
+                    >
+                      <Archive className="w-4 h-4" />
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => handleRestore(prod.id)}
+                      title="Restore Product"
+                      className="text-[#737B52] hover:text-[#43291F] p-2 rounded-lg hover:bg-green-50 touch-manipulation min-h-[32px] min-w-[32px] flex items-center justify-center"
+                    >
+                      <RotateCcw className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Desktop Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
               <tr>
@@ -369,7 +468,7 @@ export function AdminMenuManager({
 
       {/* ── ADD CATEGORY MODAL ── */}
       <Dialog open={showAddCategoryModal} onOpenChange={setShowAddCategoryModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add Menu Category</DialogTitle>
           </DialogHeader>
@@ -399,7 +498,7 @@ export function AdminMenuManager({
 
       {/* ── ADD PRODUCT MODAL (With Live Profit Calculator) ── */}
       <Dialog open={showAddProductModal} onOpenChange={setShowAddProductModal}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-lg w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Product to Menu</DialogTitle>
           </DialogHeader>
@@ -529,7 +628,7 @@ export function AdminMenuManager({
       {/* ── EDIT PRODUCT MODAL (With Live Profit Calculator) ── */}
       {editingProduct && (
         <Dialog open={showEditProductModal} onOpenChange={setShowEditProductModal}>
-          <DialogContent className="max-w-lg">
+          <DialogContent className="max-w-lg w-full max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Edit Product: {editingProduct.name}</DialogTitle>
             </DialogHeader>

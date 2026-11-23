@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Search, Printer, Receipt, Eye, Filter, Download, Calendar } from "lucide-react"
+import { Search, Printer, Receipt, Eye, Filter, Download, Calendar, Clock } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
@@ -56,8 +56,16 @@ export function AdminSalesHistory({
       shopAddress,
       shopPhone,
       invoiceNo: sale.invoice_no,
-      date: new Date(sale.created_at).toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' }),
-      time: new Date(sale.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit', hour12: true }),
+      date: new Date(sale.created_at).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      }),
+      time: new Date(sale.created_at).toLocaleTimeString("en-IN", {
+        hour: "2-digit",
+        minute: "2-digit",
+        hour12: true,
+      }),
       cashierName: sale.profiles?.full_name || "Manager",
       customerName: sale.customer_name,
       customerPhone: sale.customer_phone,
@@ -85,11 +93,11 @@ export function AdminSalesHistory({
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+    <div className="space-y-6 max-w-7xl mx-auto w-full min-w-0">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
         <div>
-          <h1 className="font-serif text-3xl font-bold text-[#43291F]">
-            Sales & Billing History
+          <h1 className="font-serif text-fluid-h1 font-bold text-[#43291F]">
+            Sales &amp; Billing History
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
             Immutable, audit-verified record of every commercial sale at Heaven&apos;s Cafe
@@ -106,16 +114,16 @@ export function AdminSalesHistory({
               placeholder="Search by bill number, product, customer..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="pl-9 text-xs h-9 bg-[#F8F3E9]"
+              className="pl-9 text-xs h-9 bg-[#F8F3E9] border-[#E8DED0]"
             />
           </div>
 
-          <div className="flex gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0">
-            {(['all', 'cash', 'upi', 'card'] as const).map((method) => (
+          <div className="flex gap-1.5 w-full sm:w-auto overflow-x-auto pb-1 sm:pb-0 scrollbar-none">
+            {(["all", "cash", "upi", "card"] as const).map((method) => (
               <button
                 key={method}
                 onClick={() => setMethodFilter(method)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors cursor-pointer ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase transition-colors cursor-pointer min-h-[36px] touch-manipulation ${
                   methodFilter === method
                     ? "bg-[#43291F] text-white"
                     : "bg-[#F8F3E9] text-[#705B51] hover:bg-[#EFE7DA] border border-[#E8DED0]"
@@ -128,9 +136,67 @@ export function AdminSalesHistory({
         </div>
       </Card>
 
-      {/* Sales Invoices Table */}
-      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Sales Invoices Table / Mobile Cards */}
+      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden min-w-0">
+        {/* Mobile Card List (< md) */}
+        <div className="block md:hidden divide-y divide-[#E8DED0]">
+          {filteredSales.map((sale) => (
+            <div key={sale.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <div className="flex items-center gap-1.5 flex-wrap">
+                    <span className="font-mono font-bold text-sm text-[#43291F]">
+                      {sale.invoice_no}
+                    </span>
+                    <Badge variant="secondary" className="capitalize text-[10px]">
+                      {sale.payments?.[0]?.method || "cash"}
+                    </Badge>
+                  </div>
+                  <div className="flex items-center gap-1 text-[11px] text-[#705B51] mt-0.5">
+                    <Clock className="w-3 h-3 text-[#A09289]" />
+                    <span>{formatDateTime(sale.created_at)}</span>
+                    <span className="text-[#A09289]">• Cashier: {sale.profiles?.full_name || "Manager"}</span>
+                  </div>
+                </div>
+
+                <div className="text-right shrink-0">
+                  <span className="font-serif font-black text-base text-[#43291F]">
+                    {formatCurrency(sale.total_amount)}
+                  </span>
+                </div>
+              </div>
+
+              {/* Items summary */}
+              <p className="text-xs text-[#705B51] line-clamp-2">
+                {sale.sale_items?.map((i: any) => `${i.product_name} (${i.quantity})`).join(", ")}
+              </p>
+
+              {/* Customer & View Receipt */}
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                <span className="text-[#A09289]">
+                  {sale.customer_name ? (
+                    <strong className="text-[#43291F] font-normal">{sale.customer_name}</strong>
+                  ) : (
+                    "Walk-in"
+                  )}
+                </span>
+
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => handleOpenReceipt(sale)}
+                  className="h-8 text-xs font-semibold border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F] touch-manipulation"
+                >
+                  <Eye className="w-3.5 h-3.5 mr-1 text-[#B56C4A]" />
+                  View Bill
+                </Button>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
               <tr>
@@ -168,7 +234,7 @@ export function AdminSalesHistory({
                       <span className="text-[#A09289] italic">Walk-in</span>
                     )}
                   </td>
-                  <td className="py-3.5 px-4">
+                  <td className="py-3.5 px-4 max-w-xs truncate">
                     <span className="text-[#705B51]">
                       {sale.sale_items?.map((i: any) => `${i.product_name} (${i.quantity})`).join(", ")}
                     </span>
@@ -199,7 +265,7 @@ export function AdminSalesHistory({
         </div>
 
         {filteredSales.length === 0 && (
-          <div className="py-14 text-center">
+          <div className="py-14 text-center px-4">
             <div className="w-12 h-12 rounded-full bg-[#FAF0EB] text-[#B56C4A] mx-auto flex items-center justify-center mb-3">
               <Receipt className="w-6 h-6" />
             </div>
@@ -217,9 +283,9 @@ export function AdminSalesHistory({
 
       {/* Invoice Detail Modal */}
       <Dialog open={showModal} onOpenChange={setShowModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-[#43291F]">
+            <DialogTitle className="flex items-center gap-2 text-[#43291F] font-serif">
               <Receipt className="w-5 h-5 text-[#B56C4A]" />
               Invoice Snapshot: {selectedSale?.invoice_no}
             </DialogTitle>

@@ -121,9 +121,9 @@ export function AdminInventoryManager({
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
         <div>
-          <h1 className="font-serif text-3xl font-bold text-[#43291F]">
+          <h1 className="font-serif text-fluid-h1 font-bold text-[#43291F]">
             Product Inventory &amp; Wastage
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
@@ -132,10 +132,10 @@ export function AdminInventoryManager({
         </div>
 
         {/* Tab Buttons */}
-        <div className="flex bg-[#EFE7DA] p-1 rounded-lg border border-[#E8DED0]">
+        <div className="flex overflow-x-auto max-w-full bg-[#EFE7DA] p-1 rounded-lg border border-[#E8DED0] scrollbar-none">
           <button
             onClick={() => setActiveTab("stocks")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[36px] touch-manipulation flex items-center gap-1.5 ${
               activeTab === "stocks"
                 ? "bg-[#43291F] text-white shadow-xs"
                 : "text-[#705B51] hover:text-[#43291F]"
@@ -151,25 +151,25 @@ export function AdminInventoryManager({
           </button>
           <button
             onClick={() => setActiveTab("inwards")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[36px] touch-manipulation flex items-center gap-1.5 ${
               activeTab === "inwards"
                 ? "bg-[#43291F] text-white shadow-xs"
                 : "text-[#705B51] hover:text-[#43291F]"
             }`}
           >
             <Truck className="w-3.5 h-3.5" />
-            Inward Deliveries Audit ({inwards.length})
+            Inwards Audit ({inwards.length})
           </button>
           <button
             onClick={() => setActiveTab("wastage")}
-            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer whitespace-nowrap min-h-[36px] touch-manipulation flex items-center gap-1.5 ${
               activeTab === "wastage"
                 ? "bg-[#43291F] text-white shadow-xs"
                 : "text-[#705B51] hover:text-[#43291F]"
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Day-End Wastage ({wastages.length})
+            Wastage ({wastages.length})
           </button>
         </div>
       </div>
@@ -282,8 +282,72 @@ export function AdminInventoryManager({
           </Card>
 
           {/* Product Stocks Table */}
-          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
+          {/* Product Stocks Table & Mobile Cards */}
+          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden min-w-0">
+            {/* Mobile Card List (< md) */}
+            <div className="block md:hidden divide-y divide-[#E8DED0]">
+              {filteredProducts.map((p) => {
+                const stock = Number(p.current_stock ?? 0)
+                const min = Number(p.min_stock ?? 10)
+                const cp = Number(p.cost_price ?? 0)
+                const sp = Number(p.base_price ?? 0)
+                const isLow = stock <= min
+
+                return (
+                  <div key={p.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-serif font-bold text-sm text-[#43291F]">{p.name}</h4>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <Badge variant="olive" className="text-[10px]">
+                            {p.menu_categories?.name || "General"}
+                          </Badge>
+                          <span className="text-[11px] text-[#A09289]">Min alert: {min}</span>
+                        </div>
+                      </div>
+
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-bold shrink-0 ${
+                          isLow ? "bg-red-100 text-red-800" : "bg-[#F0F1EA] text-[#737B52]"
+                        }`}
+                      >
+                        {isLow && <AlertTriangle className="w-3 h-3 text-red-600" />}
+                        {stock} units
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                      <div>
+                        <span className="text-[#705B51]">Price: </span>
+                        <strong className="text-[#43291F] font-mono">{formatCurrency(sp)}</strong>
+                        <span className="text-[#A09289] ml-2">Cost: {formatCurrency(cp)}</span>
+                      </div>
+                      <span className="font-mono font-bold text-[#43291F]">
+                        Valuation: {formatCurrency(stock * cp)}
+                      </span>
+                    </div>
+
+                    <div className="pt-1">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => {
+                          setSelectedProduct(p)
+                          setAdjustmentAmount(10)
+                        }}
+                        className="w-full h-8 text-xs font-semibold border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F] touch-manipulation"
+                      >
+                        <PackageCheck className="w-3.5 h-3.5 mr-1.5 text-[#737B52]" />
+                        Adjust / Inward Stock
+                      </Button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
                   <tr>
@@ -433,7 +497,44 @@ export function AdminInventoryManager({
               </Badge>
             </CardHeader>
 
-            <div className="overflow-x-auto">
+            {/* Mobile Card List (< md) */}
+            <div className="block md:hidden divide-y divide-[#E8DED0]">
+              {inwards.map((i) => (
+                <div key={i.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-serif font-bold text-sm text-[#43291F]">
+                        {i.products?.name || "Product"}
+                      </h4>
+                      <p className="text-[11px] text-[#705B51] mt-0.5">
+                        {formatDateTime(i.created_at)}
+                      </p>
+                    </div>
+                    <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-xs font-bold shrink-0">
+                      +{i.quantity} units
+                    </span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                    <span className="text-[#705B51]">
+                      Unit: <span className="font-mono text-[#43291F]">{formatCurrency(i.unit_cost || 0)}</span>
+                    </span>
+                    <span className="font-mono font-bold text-[#43291F]">
+                      Total: {formatCurrency(i.total_cost || 0)}
+                    </span>
+                  </div>
+
+                  <div className="text-[11px] text-[#705B51] bg-[#F8F3E9] p-2 rounded-md">
+                    <div>Vendor: <strong>{i.supplier_name || "Direct Vendor"}</strong></div>
+                    {i.invoice_ref && <div className="font-mono text-[#A09289]">Ref: {i.invoice_ref}</div>}
+                    <div className="text-[#A09289] mt-0.5">Received by: {i.profiles?.full_name || "Store Manager"}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F8F3E9]/50 border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
                   <tr>
@@ -555,7 +656,52 @@ export function AdminInventoryManager({
               </CardTitle>
             </CardHeader>
 
-            <div className="overflow-x-auto">
+            {/* Mobile Card List (< md) */}
+            <div className="block md:hidden divide-y divide-[#E8DED0]">
+              {wastages.map((w) => {
+                const loss = Number(w.total_loss || w.total_cost_loss || 0)
+                const cp = Number(w.cost_price || 0)
+
+                return (
+                  <div key={w.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-serif font-bold text-sm text-[#43291F]">
+                          {w.products?.name || "Product"}
+                        </h4>
+                        <p className="text-[11px] text-[#705B51] mt-0.5">
+                          {formatDateTime(w.created_at)}
+                        </p>
+                      </div>
+                      <span className="font-bold text-xs text-red-700 bg-red-100 px-2 py-0.5 rounded-full shrink-0">
+                        {w.quantity} units wasted
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                      <div className="flex items-center gap-1.5">
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {w.reason?.replace("_", " ") || "Expired"}
+                        </Badge>
+                        <span className="text-[#A09289]">CP: {formatCurrency(cp)}</span>
+                      </div>
+                      <span className="font-mono font-bold text-red-700">
+                        Loss: -{formatCurrency(loss)}
+                      </span>
+                    </div>
+
+                    {w.notes && (
+                      <p className="text-[11px] text-[#705B51] bg-[#F8F3E9] p-2 rounded-md">
+                        Notes: {w.notes}
+                      </p>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F8F3E9]/50 border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
                   <tr>
@@ -625,7 +771,7 @@ export function AdminInventoryManager({
       {/* ── QUICK STOCK INWARD / ADJUSTMENT MODAL ── */}
       {selectedProduct && (
         <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
-          <DialogContent className="max-w-md">
+          <DialogContent className="max-w-md w-full max-h-[90dvh] overflow-y-auto">
             <DialogHeader>
               <DialogTitle>Stock Inward / Adjustment: {selectedProduct.name}</DialogTitle>
             </DialogHeader>

@@ -71,13 +71,13 @@ export function DailyClosingForm({ summary }: DailyClosingFormProps) {
   }
 
   return (
-    <div className="max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
+    <div className="max-w-2xl mx-auto space-y-6 w-full min-w-0">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2">
         <div>
-          <h2 className="font-serif text-2xl font-bold text-[#43291F]">
+          <h2 className="font-serif text-fluid-h2 font-bold text-[#43291F]">
             Daily Closing & Cash Reconciliation
           </h2>
-          <p className="text-xs text-[#705B51]">
+          <p className="text-xs text-[#705B51] mt-0.5">
             Date: <span className="font-bold text-[#43291F]">{summary.closing_date}</span>
           </p>
         </div>
@@ -98,17 +98,17 @@ export function DailyClosingForm({ summary }: DailyClosingFormProps) {
 
       {/* Today's Sales Breakdown Card */}
       <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm">
-        <CardHeader className="border-b border-[#E8DED0] pb-3">
-          <CardTitle className="text-base text-[#43291F] flex items-center gap-2">
+        <CardHeader className="border-b border-[#E8DED0] pb-3 p-3.5 sm:p-5">
+          <CardTitle className="text-sm sm:text-base text-[#43291F] flex items-center gap-2">
             <CalendarCheck className="w-5 h-5 text-[#B56C4A]" />
             Sales Registered Today
           </CardTitle>
-          <CardDescription>
+          <CardDescription className="text-xs">
             Calculated automatically from completed transactions in the database.
           </CardDescription>
         </CardHeader>
 
-        <CardContent className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3 text-center">
+        <CardContent className="p-3 sm:p-4 grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3 text-center">
           <div className="p-3 rounded-lg bg-[#F8F3E9] border border-[#E8DED0]">
             <Banknote className="w-5 h-5 text-emerald-700 mx-auto mb-1" />
             <span className="text-[10px] uppercase font-bold text-[#705B51] block">Cash</span>

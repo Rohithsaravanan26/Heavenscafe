@@ -64,10 +64,10 @@ export function AdminSettingsForm({
   }
 
   return (
-    <div className="space-y-6 max-w-4xl">
+    <div className="space-y-6 max-w-4xl mx-auto w-full min-w-0">
       <div>
-        <h1 className="font-serif text-3xl font-bold text-[#43291F]">
-          Business & Thermal Printer Configuration
+        <h1 className="font-serif text-fluid-h1 font-bold text-[#43291F]">
+          Business &amp; Thermal Printer Configuration
         </h1>
         <p className="text-xs text-[#705B51] mt-0.5">
           Configure cafe address, tax rules, invoice sequencing and physical thermal receipt printers

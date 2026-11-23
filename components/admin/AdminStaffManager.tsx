@@ -43,9 +43,45 @@ export function AdminStaffManager({ initialStaff }: AdminStaffManagerProps) {
         </Button>
       </div>
 
-      {/* Staff Table */}
-      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-        <div className="overflow-x-auto">
+      {/* Staff Table & Mobile Cards */}
+      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden min-w-0">
+        {/* Mobile Card List (< md) */}
+        <div className="block md:hidden divide-y divide-[#E8DED0]">
+          {staff.map((member) => (
+            <div key={member.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h4 className="font-bold text-sm text-[#43291F]">{member.full_name}</h4>
+                  <p className="text-[11px] text-[#705B51] mt-0.5">
+                    Phone: {member.phone || "—"} • Created: {formatDate(member.created_at)}
+                  </p>
+                </div>
+                <Badge
+                  variant={member.is_active ? "success" : "destructive"}
+                  className="text-[10px] shrink-0"
+                >
+                  {member.is_active ? "Active" : "Disabled"}
+                </Badge>
+              </div>
+
+              <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                <Badge
+                  variant={member.role === "ADMIN" ? "terracotta" : "olive"}
+                  className="text-[10px]"
+                >
+                  {member.role === "ADMIN" ? "Admin (Remote)" : "Shop Manager (POS)"}
+                </Badge>
+
+                <span className="text-[11px] text-[#705B51]">
+                  {member.role === "ADMIN" ? "Full Business Suite" : "POS Billing & Stock Only"}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* Desktop Table (>= md) */}
+        <div className="hidden md:block overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
               <tr>
@@ -109,7 +145,7 @@ export function AdminStaffManager({ initialStaff }: AdminStaffManagerProps) {
 
       {/* ── CREATE STAFF MODAL INSTRUCTIONS ── */}
       <Dialog open={showAddModal} onOpenChange={setShowAddModal}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Create Manager / Staff Account</DialogTitle>
           </DialogHeader>

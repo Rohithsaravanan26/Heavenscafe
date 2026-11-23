@@ -87,9 +87,9 @@ export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverview
   return (
     <div className="space-y-6">
       {/* Welcome & Time Switcher Header */}
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 min-w-0">
         <div>
-          <h1 className="font-serif text-3xl font-bold text-[#43291F]">
+          <h1 className="font-serif text-fluid-h1 font-bold text-[#43291F]">
             Commercial Overview
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
@@ -98,11 +98,11 @@ export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverview
         </div>
 
         {/* Period Switcher (Billzgo style) */}
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 w-full sm:w-auto">
           <div className="flex bg-[#EFE7DA] p-1 rounded-lg border border-[#E8DED0]">
             <button
               onClick={() => setPeriod("today")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer min-h-[36px] touch-manipulation ${
                 isToday ? "bg-[#43291F] text-white shadow-xs" : "text-[#705B51] hover:text-[#43291F]"
               }`}
             >
@@ -110,7 +110,7 @@ export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverview
             </button>
             <button
               onClick={() => setPeriod("month")}
-              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer min-h-[36px] touch-manipulation ${
                 !isToday ? "bg-[#43291F] text-white shadow-xs" : "text-[#705B51] hover:text-[#43291F]"
               }`}
             >
@@ -118,8 +118,8 @@ export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverview
             </button>
           </div>
 
-          <Link href="/admin/menu">
-            <Button size="sm" variant="outline" className="border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F] text-xs font-semibold">
+          <Link href="/admin/menu" className="w-full sm:w-auto">
+            <Button size="sm" variant="outline" className="w-full sm:w-auto border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F] text-xs font-semibold min-h-[36px]">
               <UtensilsCrossed className="w-3.5 h-3.5 mr-1 text-[#B56C4A]" />
               Manage Costs &amp; Prices
             </Button>
@@ -153,7 +153,7 @@ export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverview
       )}
 
       {/* ── 4 CORE FINANCIAL PILLARS (Billzgo Model) ── */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {/* 1. Gross Revenue */}
         <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
           <div className="flex items-center justify-between">
@@ -355,7 +355,50 @@ export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverview
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="overflow-x-auto">
+          {/* Mobile Card List (< md) */}
+          <div className="block md:hidden divide-y divide-[#E8DED0]">
+            {low_stock_items.map((p) => {
+              const sp = Number(p.base_price || 0)
+              const cp = Number(p.cost_price || 0)
+              const profit = sp - cp
+              const isLow = Number(p.current_stock) <= Number(p.min_stock)
+              const isOut = Number(p.current_stock) <= 0
+
+              return (
+                <div key={p.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+                  <div className="flex items-start justify-between gap-2">
+                    <div>
+                      <h4 className="font-serif font-bold text-sm text-[#43291F]">{p.name}</h4>
+                      <p className="text-[11px] text-[#705B51] mt-0.5">
+                        Selling: <strong>{formatCurrency(sp)}</strong> | Cost: {formatCurrency(cp)}
+                      </p>
+                    </div>
+                    {isOut ? (
+                      <Badge variant="destructive" className="text-[10px] shrink-0">
+                        Out of Stock
+                      </Badge>
+                    ) : isLow ? (
+                      <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-800 bg-amber-50 shrink-0">
+                        Low Stock
+                      </Badge>
+                    ) : (
+                      <Badge variant="olive" className="text-[10px] shrink-0">
+                        Adequate
+                      </Badge>
+                    )}
+                  </div>
+
+                  <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                    <span className="font-semibold text-emerald-700">Profit: +{formatCurrency(profit)}/unit</span>
+                    <span className="font-bold font-mono text-[#43291F]">{p.current_stock} units left</span>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+
+          {/* Desktop Table (>= md) */}
+          <div className="hidden md:block overflow-x-auto">
             <table className="w-full text-left text-xs">
               <thead className="bg-[#F8F3E9] text-[#705B51] uppercase text-[10px] tracking-wider border-b border-[#E8DED0]">
                 <tr>

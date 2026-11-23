@@ -133,17 +133,17 @@ export function DailyExpenseForm({ initialExpenses }: DailyExpenseFormProps) {
         </div>
 
         {/* Cash Drawer Impact Stat */}
-        <div className="flex items-center gap-3">
-          <div className="px-3.5 py-1.5 rounded-lg bg-red-50 border border-red-200 text-right">
+        <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 sm:gap-3 w-full sm:w-auto">
+          <div className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-red-50 border border-red-200 text-left sm:text-right">
             <span className="text-[10px] uppercase font-bold text-red-700 block">Cash Drawer Paid Out</span>
-            <span className="font-serif font-bold text-base text-red-700 font-mono">
+            <span className="font-serif font-bold text-sm sm:text-base text-red-700 font-mono">
               -{formatCurrency(todayCashExpensesTotal)}
             </span>
           </div>
 
-          <div className="px-3.5 py-1.5 rounded-lg bg-[#F8F3E9] border border-[#E8DED0] text-right">
+          <div className="flex-1 sm:flex-initial px-3 py-1.5 rounded-lg bg-[#F8F3E9] border border-[#E8DED0] text-left sm:text-right">
             <span className="text-[10px] uppercase font-bold text-[#705B51] block">Total Expenses Today</span>
-            <span className="font-serif font-bold text-base text-[#43291F] font-mono">
+            <span className="font-serif font-bold text-sm sm:text-base text-[#43291F] font-mono">
               {formatCurrency(todayTotalExpenses)}
             </span>
           </div>
@@ -323,7 +323,59 @@ export function DailyExpenseForm({ initialExpenses }: DailyExpenseFormProps) {
               </Badge>
             </CardHeader>
 
-            <div className="overflow-x-auto max-h-[500px]">
+            {/* Mobile Cards List (< md) */}
+            <div className="block md:hidden divide-y divide-[#E8DED0]">
+              {expenses.map((e) => {
+                const isCash = e.payment_source === "cash_drawer"
+                return (
+                  <div key={e.id} className="p-3.5 space-y-2 hover:bg-[#F8F3E9]/50 transition-colors">
+                    <div className="flex items-start justify-between gap-2">
+                      <div>
+                        <h4 className="font-semibold text-xs sm:text-sm text-[#43291F]">
+                          {e.description}
+                        </h4>
+                        <p className="text-[11px] text-[#705B51] mt-0.5">
+                          {formatDateTime(e.created_at)}
+                        </p>
+                      </div>
+                      <span className="font-serif font-black text-sm sm:text-base text-red-700 shrink-0 font-mono">
+                        -{formatCurrency(e.amount)}
+                      </span>
+                    </div>
+
+                    <div className="flex items-center justify-between text-xs pt-1 border-t border-[#E8DED0]/60">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        <Badge variant="outline" className="text-[10px] capitalize">
+                          {e.category?.replace("_", " ") || "Other"}
+                        </Badge>
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            isCash ? "bg-red-100 text-red-800" : "bg-blue-100 text-blue-800"
+                          }`}
+                        >
+                          {isCash ? "Cash Drawer" : "UPI/Owner"}
+                        </span>
+                        {e.reference && (
+                          <span className="text-[10px] text-[#A09289] font-mono">Ref: {e.reference}</span>
+                        )}
+                      </div>
+
+                      <button
+                        type="button"
+                        onClick={() => handleDelete(e.id)}
+                        title="Delete Record"
+                        className="text-[#A09289] hover:text-red-700 p-2 rounded-lg hover:bg-red-50 touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Desktop Table (>= md) */}
+            <div className="hidden md:block overflow-x-auto max-h-[500px]">
               <table className="w-full text-left text-xs">
                 <thead className="bg-[#F8F3E9]/50 border-b border-[#E8DED0] font-serif font-bold text-[#43291F] sticky top-0">
                   <tr>
@@ -384,17 +436,17 @@ export function DailyExpenseForm({ initialExpenses }: DailyExpenseFormProps) {
                   })}
                 </tbody>
               </table>
-
-              {expenses.length === 0 && (
-                <div className="py-12 text-center text-[#A09289]">
-                  <Wallet className="w-8 h-8 mx-auto mb-2 opacity-40 text-[#737B52]" />
-                  <p className="font-serif font-bold text-sm text-[#43291F]">No Expenses Recorded Today</p>
-                  <p className="text-xs text-[#705B51] mt-0.5">
-                    Use the form on the left to record daily milk, lemons, or gas expenses.
-                  </p>
-                </div>
-              )}
             </div>
+
+            {expenses.length === 0 && (
+              <div className="py-12 text-center text-[#A09289] px-4">
+                <Wallet className="w-8 h-8 mx-auto mb-2 opacity-40 text-[#737B52]" />
+                <p className="font-serif font-bold text-sm text-[#43291F]">No Expenses Recorded Today</p>
+                <p className="text-xs text-[#705B51] mt-0.5">
+                  Use the form on the left to record daily milk, lemons, or gas expenses.
+                </p>
+              </div>
+            )}
           </Card>
         </div>
       </div>
