@@ -6,6 +6,8 @@ import {
 import { getClosingHistory } from "@/lib/actions/closing"
 import { AdminReportsView } from "@/components/admin/AdminReportsView"
 
+export const dynamic = "force-dynamic"
+
 export default async function AdminReportsPage() {
   const [overview, topProducts, paymentMethods, closingHistory] = await Promise.all([
     getDashboardOverview(),

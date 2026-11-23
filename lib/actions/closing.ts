@@ -1,7 +1,7 @@
 'use server'
 
 import { revalidatePath } from 'next/cache'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createAdminClient } from '@/lib/supabase/server'
 import { DailyClosing } from '@/types/database'
 
 export async function getTodayClosingSummary() {
@@ -191,70 +191,83 @@ export async function getClosingHistory(limit = 60) {
 }
 
 export async function reviewDailyClosingAction(closingId: string, reviewNotes?: string) {
-  const supabase = await createClient()
+  try {
+    const supabase = await createClient()
 
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
 
-  if (!user) throw new Error('Not authenticated')
+    if (!user) {
+      return { success: false, error: 'User session expired. Please sign in again.' }
+    }
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('shop_id, role, full_name')
-    .eq('id', user.id)
-    .single()
+    // Check user profile and role case-insensitively
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('shop_id, role, full_name')
+      .eq('id', user.id)
+      .single()
 
-  if (!profile || profile.role !== 'admin') {
-    throw new Error('Only administrators can review daily register closings')
-  }
+    const userRole = (profile?.role || '').toUpperCase()
+    if (!profile || (userRole !== 'ADMIN' && userRole !== 'OWNER')) {
+      return { success: false, error: 'Only administrators can review daily register closings.' }
+    }
 
-  const { data: existingClosing, error: fetchErr } = await supabase
-    .from('daily_closings')
-    .select('*')
-    .eq('id', closingId)
-    .single()
+    // Use admin client to reliably perform update and audit log
+    const adminSupabase = await createAdminClient()
 
-  if (fetchErr || !existingClosing) {
-    throw new Error('Closing record not found')
-  }
+    const { data: existingClosing, error: fetchErr } = await adminSupabase
+      .from('daily_closings')
+      .select('*')
+      .eq('id', closingId)
+      .single()
 
-  const updatedRemarks = reviewNotes?.trim()
-    ? existingClosing.remarks
-      ? `${existingClosing.remarks} | Admin Review (${profile.full_name}): ${reviewNotes.trim()}`
-      : `Admin Review (${profile.full_name}): ${reviewNotes.trim()}`
-    : existingClosing.remarks
+    if (fetchErr || !existingClosing) {
+      return { success: false, error: 'Closing record not found.' }
+    }
 
-  const { data: updatedClosing, error: updateErr } = await supabase
-    .from('daily_closings')
-    .update({
-      status: 'reviewed',
-      reviewed_by: user.id,
-      remarks: updatedRemarks,
-      updated_at: new Date().toISOString(),
+    const adminName = profile.full_name || 'Cafe Owner'
+    const updatedRemarks = reviewNotes?.trim()
+      ? existingClosing.remarks
+        ? `${existingClosing.remarks} | Admin Review (${adminName}): ${reviewNotes.trim()}`
+        : `Admin Review (${adminName}): ${reviewNotes.trim()}`
+      : existingClosing.remarks
+
+    const { data: updatedClosing, error: updateErr } = await adminSupabase
+      .from('daily_closings')
+      .update({
+        status: 'reviewed',
+        reviewed_by: user.id,
+        remarks: updatedRemarks,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', closingId)
+      .select()
+      .single()
+
+    if (updateErr) {
+      return { success: false, error: `Failed to review closing: ${updateErr.message}` }
+    }
+
+    // Record tamper-evident audit log
+    await adminSupabase.from('audit_logs').insert({
+      shop_id: profile.shop_id || existingClosing.shop_id,
+      user_id: user.id,
+      action_type: 'DAILY_CLOSING_REVIEWED',
+      table_name: 'daily_closings',
+      record_id: closingId,
+      old_value: { status: existingClosing.status, reviewed_by: existingClosing.reviewed_by },
+      new_value: { status: 'reviewed', reviewed_by: user.id, remarks: updatedRemarks },
     })
-    .eq('id', closingId)
-    .select()
-    .single()
 
-  if (updateErr) {
-    throw new Error(`Failed to review closing: ${updateErr.message}`)
+    revalidatePath('/pos/closing')
+    revalidatePath('/admin')
+    revalidatePath('/admin/reports')
+
+    return { success: true, closing: updatedClosing }
+  } catch (err: any) {
+    console.error('reviewDailyClosingAction error:', err)
+    return { success: false, error: err?.message || 'An unexpected error occurred during review.' }
   }
-
-  // Record tamper-evident audit log
-  await supabase.from('audit_logs').insert({
-    shop_id: profile.shop_id,
-    user_id: user.id,
-    action_type: 'DAILY_CLOSING_REVIEWED',
-    table_name: 'daily_closings',
-    record_id: closingId,
-    old_value: { status: existingClosing.status, reviewed_by: existingClosing.reviewed_by },
-    new_value: { status: 'reviewed', reviewed_by: user.id, remarks: updatedRemarks },
-  })
-
-  revalidatePath('/pos/closing')
-  revalidatePath('/admin')
-  revalidatePath('/admin/reports')
-
-  return { success: true, closing: updatedClosing }
 }

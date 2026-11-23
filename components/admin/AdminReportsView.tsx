@@ -157,6 +157,8 @@ export function AdminReportsView({
         )
         setReviewSuccess("Daily register closing successfully marked as reviewed & audited.")
         setReviewNotes("")
+      } else {
+        setReviewError(res.error || "Failed to review closing.")
       }
     } catch (err: any) {
       setReviewError(err?.message || "Failed to review closing.")
