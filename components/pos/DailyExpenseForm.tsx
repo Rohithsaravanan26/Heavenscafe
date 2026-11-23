@@ -17,6 +17,7 @@ import {
   AlertCircle,
   Receipt,
   CheckCircle2,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -288,9 +289,16 @@ export function DailyExpenseForm({ initialExpenses }: DailyExpenseFormProps) {
                 <Button
                   type="submit"
                   disabled={submitting || amount <= 0 || !description.trim()}
-                  className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm shadow-sm"
+                  className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2"
                 >
-                  {submitting ? "Recording Expense..." : `Record ₹${amount} Expense`}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-[#FAF0EB]" />
+                      <span>Recording Expense...</span>
+                    </>
+                  ) : (
+                    `Record ₹${amount} Expense`
+                  )}
                 </Button>
               </form>
             </CardContent>

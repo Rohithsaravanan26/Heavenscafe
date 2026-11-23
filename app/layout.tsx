@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { Playfair_Display, Inter, JetBrains_Mono } from 'next/font/google'
+import { NavigationProgress } from '@/components/ui/NavigationProgress'
 import './globals.css'
 
 const playfair = Playfair_Display({
@@ -45,6 +46,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={`${playfair.variable} ${inter.variable} ${jetbrainsMono.variable}`} suppressHydrationWarning>
       <body className="min-h-screen bg-[#F8F3E9] text-[#30231E] font-sans antialiased">
+        <NavigationProgress />
         {children}
       </body>
     </html>

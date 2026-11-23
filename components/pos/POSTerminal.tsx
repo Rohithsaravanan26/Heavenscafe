@@ -15,6 +15,7 @@ import {
   AlertTriangle,
   User,
   Phone,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -605,9 +606,16 @@ export function POSTerminal({
             type="button"
             disabled={cart.length === 0 || submitting}
             onClick={handleCheckout}
-            className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm tracking-wide shadow-md active:scale-98 transition-all"
+            className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm tracking-wide shadow-md active:scale-98 transition-all flex items-center justify-center gap-2"
           >
-            {submitting ? "Processing Bill..." : `Charge ${formatCurrency(totalAmount)} & Print`}
+            {submitting ? (
+              <>
+                <Loader2 className="w-4 h-4 animate-spin text-[#FAF0EB]" />
+                <span>Processing Bill...</span>
+              </>
+            ) : (
+              `Charge ${formatCurrency(totalAmount)} & Print`
+            )}
           </Button>
         </div>
       </div>

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { CalendarCheck, Banknote, QrCode, CreditCard, AlertCircle, CheckCircle, ArrowRight } from "lucide-react"
+import { CalendarCheck, Banknote, QrCode, CreditCard, AlertCircle, CheckCircle, ArrowRight, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -235,10 +235,19 @@ export function DailyClosingForm({ summary }: DailyClosingFormProps) {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-12 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm shadow-md"
+              className="w-full h-12 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm shadow-md flex items-center justify-center gap-2"
             >
-              {loading ? "Submitting Closing Record..." : "Confirm & Submit Daily Closing"}
-              <ArrowRight className="w-4 h-4 ml-2" />
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#FAF0EB]" />
+                  <span>Submitting Closing Record...</span>
+                </>
+              ) : (
+                <>
+                  <span>Confirm &amp; Submit Daily Closing</span>
+                  <ArrowRight className="w-4 h-4" />
+                </>
+              )}
             </Button>
           </form>
         </CardContent>

@@ -1,7 +1,7 @@
 "use client"
 
 import * as React from "react"
-import { Trash2, AlertTriangle, ArrowRight, History } from "lucide-react"
+import { Trash2, AlertTriangle, ArrowRight, History, Loader2 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -222,10 +222,19 @@ export function WastageForm({ products, recentWastages = [] }: WastageFormProps)
               <Button
                 type="submit"
                 disabled={loading}
-                className="w-full h-11 bg-red-700 hover:bg-red-800 text-white font-bold text-sm shadow"
+                className="w-full h-11 bg-red-700 hover:bg-red-800 text-white font-bold text-sm shadow flex items-center justify-center gap-2"
               >
-                {loading ? "Recording Loss..." : `Confirm Wastage of ${formatCurrency(calculatedLoss)}`}
-                <ArrowRight className="w-4 h-4 ml-2" />
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-white" />
+                    <span>Recording Loss...</span>
+                  </>
+                ) : (
+                  <>
+                    <span>Confirm Wastage of {formatCurrency(calculatedLoss)}</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </>
+                )}
               </Button>
             </form>
           </CardContent>

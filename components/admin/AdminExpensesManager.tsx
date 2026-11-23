@@ -12,6 +12,7 @@ import {
   Filter,
   CheckCircle2,
   Coffee,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -357,9 +358,16 @@ export function AdminExpensesManager({ initialExpenses }: AdminExpensesManagerPr
             <Button
               type="submit"
               disabled={loading}
-              className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold"
+              className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold flex items-center justify-center gap-2"
             >
-              {loading ? "Recording..." : "Save Expense Record"}
+              {loading ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-[#FAF0EB]" />
+                  <span>Recording...</span>
+                </>
+              ) : (
+                "Save Expense Record"
+              )}
             </Button>
           </form>
         </DialogContent>

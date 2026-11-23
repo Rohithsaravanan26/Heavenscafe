@@ -14,6 +14,7 @@ import {
   RefreshCw,
   PackageCheck,
   Truck,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -685,9 +686,16 @@ export function AdminInventoryManager({
               <Button
                 type="submit"
                 disabled={loading || adjustmentAmount === 0}
-                className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold"
+                className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold flex items-center justify-center gap-2"
               >
-                {loading ? "Updating Stock..." : "Confirm Stock Inward"}
+                {loading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin text-[#FAF0EB]" />
+                    <span>Updating Stock...</span>
+                  </>
+                ) : (
+                  "Confirm Stock Inward"
+                )}
               </Button>
             </form>
           </DialogContent>

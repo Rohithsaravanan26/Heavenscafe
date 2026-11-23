@@ -11,6 +11,7 @@ import {
   FileText,
   Clock,
   ArrowRight,
+  Loader2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -313,9 +314,16 @@ export function StockInwardForm({ products: initialProducts, initialInwards }: S
                 <Button
                   type="submit"
                   disabled={submitting || quantity <= 0}
-                  className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm shadow-sm"
+                  className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm shadow-sm flex items-center justify-center gap-2"
                 >
-                  {submitting ? "Updating Store Stock..." : `Confirm Inward (+${quantity} units)`}
+                  {submitting ? (
+                    <>
+                      <Loader2 className="w-4 h-4 animate-spin text-[#FAF0EB]" />
+                      <span>Updating Store Stock...</span>
+                    </>
+                  ) : (
+                    `Confirm Inward (+${quantity} units)`
+                  )}
                 </Button>
               </form>
             </CardContent>
