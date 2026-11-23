@@ -44,8 +44,7 @@ export async function getAllProductsAdmin() {
       *,
       menu_categories (name),
       product_variants (*),
-      product_addons (*),
-      recipes (id, name, is_active)
+      product_addons (*)
     `)
     .order('category_id')
     .order('display_order')

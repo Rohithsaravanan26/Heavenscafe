@@ -42,8 +42,8 @@ export function AdminReportsView({
   const cogs = isToday ? Number(overviewData?.today_cogs || 0) : Number(overviewData?.month_cogs || 0)
   const grossProfit = Math.max(0, sales - cogs)
   const wastageLoss = isToday ? Number(overviewData?.today_wastage_loss || 0) : Number(overviewData?.month_wastage_loss || 0)
-  const expenses = isToday ? Number(overviewData?.total_expenses || 0) / 30 : Number(overviewData?.total_expenses || 0)
-  const netProfit = grossProfit - wastageLoss - (isToday ? 0 : expenses)
+  const expenses = isToday ? Number(overviewData?.today_expenses || 0) : Number(overviewData?.total_expenses || 0)
+  const netProfit = grossProfit - wastageLoss - expenses
   const netMargin = sales > 0 ? ((netProfit / sales) * 100).toFixed(1) : "0.0"
 
   const handlePrint = () => {

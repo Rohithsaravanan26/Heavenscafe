@@ -236,19 +236,35 @@ DECLARE
   v_avg_bill      NUMERIC := 0;
   v_low_stock     INTEGER := 0;
 BEGIN
+  -- 1. Sales totals (strictly from sales table, NO joins that duplicate rows)
   SELECT
-    COALESCE(SUM(s.total_amount), 0),
-    COUNT(DISTINCT s.id),
+    COALESCE(SUM(total_amount), 0),
+    COUNT(*)
+  INTO
+    v_gross_sales, v_total_bills
+  FROM sales
+  WHERE shop_id = p_shop_id
+    AND status = 'completed'
+    AND DATE(created_at) >= p_start_date
+    AND DATE(created_at) <= p_end_date;
+
+  -- 2. Manufacturing cost & profit (from sale_items joined to completed sales)
+  SELECT
     COALESCE(SUM(si.cost_price * si.quantity), 0),
     COALESCE(SUM(si.profit), 0)
   INTO
-    v_gross_sales, v_total_bills, v_total_cogs, v_gross_profit
-  FROM sales s
-  LEFT JOIN sale_items si ON s.id = si.sale_id
+    v_total_cogs, v_gross_profit
+  FROM sale_items si
+  JOIN sales s ON s.id = si.sale_id
   WHERE s.shop_id = p_shop_id
     AND s.status = 'completed'
     AND DATE(s.created_at) >= p_start_date
     AND DATE(s.created_at) <= p_end_date;
+
+  -- If profit was not stored or is 0, gross profit = gross_sales - cogs
+  IF v_gross_profit = 0 AND v_gross_sales > 0 AND v_total_cogs > 0 THEN
+    v_gross_profit := v_gross_sales - v_total_cogs;
+  END IF;
 
   SELECT
     COALESCE(SUM(total_loss), 0),
