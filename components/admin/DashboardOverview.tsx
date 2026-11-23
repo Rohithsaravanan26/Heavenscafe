@@ -25,7 +25,7 @@ import {
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
-import { formatCurrency } from "@/lib/utils"
+import { formatCurrency, formatDate } from "@/lib/utils"
 
 interface DashboardOverviewProps {
   data: {
@@ -50,9 +50,14 @@ interface DashboardOverviewProps {
     low_stock_items: any[]
   } | null
   lowStockCount?: number
+  recentClosings?: any[]
 }
 
-export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverviewProps) {
+export function DashboardOverview({
+  data,
+  lowStockCount = 0,
+  recentClosings = [],
+}: DashboardOverviewProps) {
   const [period, setPeriod] = React.useState<"today" | "month">("today")
 
   if (!data) {
@@ -151,6 +156,37 @@ export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverview
           </Card>
         </Link>
       )}
+
+      {/* ── DAILY CLOSING DISCREPANCY BANNER ── */}
+      {(() => {
+        const discrepancyClosing = recentClosings?.find((c) => c.status === "discrepancy")
+        if (!discrepancyClosing) return null
+        return (
+          <Link href="/admin/reports">
+            <Card className="border-2 border-red-300 bg-red-50/80 shadow-sm cursor-pointer hover:bg-red-50 transition-colors">
+              <CardContent className="p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                    <AlertTriangle className="w-5 h-5 text-red-700" />
+                  </div>
+                  <div>
+                    <p className="text-xs font-bold text-red-950">
+                      Daily Cash Discrepancy Alert — {formatDate(discrepancyClosing.closing_date)}
+                    </p>
+                    <p className="text-[11px] text-red-800 mt-0.5">
+                      Physical cash shortage of {formatCurrency(Math.abs(Number(discrepancyClosing.difference || 0)))} reported by {discrepancyClosing.profiles?.full_name || "Store Manager"}. Click to inspect and audit register closings.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5 text-xs font-bold text-red-800 shrink-0">
+                  <span>Review Closing</span>
+                  <ArrowUpRight className="w-4 h-4" />
+                </div>
+              </CardContent>
+            </Card>
+          </Link>
+        )
+      })()}
 
       {/* ── 4 CORE FINANCIAL PILLARS (Billzgo Model) ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">

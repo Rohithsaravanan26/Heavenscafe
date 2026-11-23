@@ -3,13 +3,15 @@ import {
   getTopProducts,
   getPaymentMethodDistribution,
 } from "@/lib/actions/analytics"
+import { getClosingHistory } from "@/lib/actions/closing"
 import { AdminReportsView } from "@/components/admin/AdminReportsView"
 
 export default async function AdminReportsPage() {
-  const [overview, topProducts, paymentMethods] = await Promise.all([
+  const [overview, topProducts, paymentMethods, closingHistory] = await Promise.all([
     getDashboardOverview(),
     getTopProducts(10),
     getPaymentMethodDistribution(),
+    getClosingHistory(60),
   ])
 
   return (
@@ -17,6 +19,7 @@ export default async function AdminReportsPage() {
       overviewData={overview}
       topProducts={topProducts}
       paymentMethods={paymentMethods}
+      closingHistory={closingHistory}
     />
   )
 }

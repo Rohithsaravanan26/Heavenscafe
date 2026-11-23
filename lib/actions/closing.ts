@@ -141,18 +141,120 @@ export async function submitDailyClosingAction(actualCash: number, remarks?: str
   return { success: true, closing: data }
 }
 
-export async function getClosingHistory(limit = 30) {
+export async function getClosingHistory(limit = 60) {
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('daily_closings')
-    .select(`
-      *,
-      profiles!daily_closings_submitted_by_fkey (full_name)
-    `)
+    .select('*')
     .order('closing_date', { ascending: false })
     .limit(limit)
 
-  if (error) return []
-  return data
+  if (error || !data) {
+    console.error('getClosingHistory error:', error)
+    return []
+  }
+
+  // Decoupled profile lookup to prevent PostgREST PGRST200 schema foreign-key cache errors
+  const userIds = Array.from(
+    new Set(
+      [
+        ...data.map((c: any) => c.submitted_by),
+        ...data.map((c: any) => c.reviewed_by),
+      ].filter(Boolean)
+    )
+  )
+
+  let profileMap: Record<string, string> = {}
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', userIds)
+
+    if (profiles) {
+      profileMap = Object.fromEntries(
+        profiles.map((p: any) => [p.id, p.full_name || 'Staff'])
+      )
+    }
+  }
+
+  return data.map((item: any) => ({
+    ...item,
+    profiles: {
+      full_name: profileMap[item.submitted_by] || 'Store Manager',
+    },
+    reviewer: item.reviewed_by
+      ? { full_name: profileMap[item.reviewed_by] || 'Admin' }
+      : null,
+  }))
+}
+
+export async function reviewDailyClosingAction(closingId: string, reviewNotes?: string) {
+  const supabase = await createClient()
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) throw new Error('Not authenticated')
+
+  const { data: profile } = await supabase
+    .from('profiles')
+    .select('shop_id, role, full_name')
+    .eq('id', user.id)
+    .single()
+
+  if (!profile || profile.role !== 'admin') {
+    throw new Error('Only administrators can review daily register closings')
+  }
+
+  const { data: existingClosing, error: fetchErr } = await supabase
+    .from('daily_closings')
+    .select('*')
+    .eq('id', closingId)
+    .single()
+
+  if (fetchErr || !existingClosing) {
+    throw new Error('Closing record not found')
+  }
+
+  const updatedRemarks = reviewNotes?.trim()
+    ? existingClosing.remarks
+      ? `${existingClosing.remarks} | Admin Review (${profile.full_name}): ${reviewNotes.trim()}`
+      : `Admin Review (${profile.full_name}): ${reviewNotes.trim()}`
+    : existingClosing.remarks
+
+  const { data: updatedClosing, error: updateErr } = await supabase
+    .from('daily_closings')
+    .update({
+      status: 'reviewed',
+      reviewed_by: user.id,
+      remarks: updatedRemarks,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', closingId)
+    .select()
+    .single()
+
+  if (updateErr) {
+    throw new Error(`Failed to review closing: ${updateErr.message}`)
+  }
+
+  // Record tamper-evident audit log
+  await supabase.from('audit_logs').insert({
+    shop_id: profile.shop_id,
+    user_id: user.id,
+    action_type: 'DAILY_CLOSING_REVIEWED',
+    table_name: 'daily_closings',
+    record_id: closingId,
+    old_value: { status: existingClosing.status, reviewed_by: existingClosing.reviewed_by },
+    new_value: { status: 'reviewed', reviewed_by: user.id, remarks: updatedRemarks },
+  })
+
+  revalidatePath('/pos/closing')
+  revalidatePath('/admin')
+  revalidatePath('/admin/reports')
+
+  return { success: true, closing: updatedClosing }
 }
