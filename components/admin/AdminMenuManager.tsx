@@ -13,6 +13,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Percent,
+  Trash2,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -30,6 +31,8 @@ import {
   archiveProductAction,
   restoreProductAction,
   addCategoryAction,
+  deleteProductAction,
+  deleteCategoryAction,
 } from "@/lib/actions/menu"
 import { formatCurrency } from "@/lib/utils"
 
@@ -53,6 +56,8 @@ export function AdminMenuManager({
   const [showEditProductModal, setShowEditProductModal] = React.useState(false)
   const [editingProduct, setEditingProduct] = React.useState<any | null>(null)
   const [showAddCategoryModal, setShowAddCategoryModal] = React.useState(false)
+  const [productToDelete, setProductToDelete] = React.useState<any | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false)
 
   // Live calculation states for Add modal
   const [addBasePrice, setAddBasePrice] = React.useState<number>(0)
@@ -119,6 +124,48 @@ export function AdminMenuManager({
       }
     } catch (err: unknown) {
       console.error(err)
+    }
+  }
+
+  const handleDeleteProduct = async () => {
+    if (!productToDelete) return
+    setLoading(true)
+    try {
+      const res = await deleteProductAction(productToDelete.id)
+      if (res.success) {
+        if (res.action === 'deleted') {
+          setProducts((prev) => prev.filter((p) => p.id !== productToDelete.id))
+          setStatusMsg({ type: 'success', text: res.message || `Product "${productToDelete.name}" permanently deleted.` })
+        } else {
+          setProducts((prev) => prev.map((p) => p.id === productToDelete.id ? { ...p, is_active: false, is_available: false } : p))
+          setStatusMsg({ type: 'success', text: res.message || `Product "${productToDelete.name}" removed from active menu.` })
+        }
+        setShowDeleteConfirm(false)
+        setProductToDelete(null)
+      } else {
+        setStatusMsg({ type: 'error', text: res.error || 'Failed to remove product' })
+      }
+    } catch (err: unknown) {
+      console.error(err)
+      setStatusMsg({ type: 'error', text: 'Error occurred while removing product' })
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleDeleteCategory = async (catId: string, catName: string) => {
+    setLoading(true)
+    try {
+      const res = await deleteCategoryAction(catId)
+      if (res.success) {
+        setCategories((prev) => prev.filter((c) => c.id !== catId))
+        if (selectedCat === catId) setSelectedCat("all")
+        setStatusMsg({ type: 'success', text: `Category "${catName}" deleted` })
+      } else {
+        setStatusMsg({ type: 'error', text: res.error || 'Failed to delete category' })
+      }
+    } finally {
+      setLoading(false)
     }
   }
 
@@ -316,7 +363,7 @@ export function AdminMenuManager({
                       type="button"
                       onClick={() => handleArchive(prod.id)}
                       title="Archive Product"
-                      className="text-[#A09289] hover:text-red-700 p-2 rounded-lg hover:bg-red-50 touch-manipulation min-h-[32px] min-w-[32px] flex items-center justify-center"
+                      className="text-[#A09289] hover:text-amber-700 p-2 rounded-lg hover:bg-amber-50 touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
                     >
                       <Archive className="w-4 h-4" />
                     </button>
@@ -325,11 +372,23 @@ export function AdminMenuManager({
                       type="button"
                       onClick={() => handleRestore(prod.id)}
                       title="Restore Product"
-                      className="text-[#737B52] hover:text-[#43291F] p-2 rounded-lg hover:bg-green-50 touch-manipulation min-h-[32px] min-w-[32px] flex items-center justify-center"
+                      className="text-[#737B52] hover:text-[#43291F] p-2 rounded-lg hover:bg-green-50 touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center"
                     >
                       <RotateCcw className="w-4 h-4" />
                     </button>
                   )}
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setProductToDelete(prod)
+                      setShowDeleteConfirm(true)
+                    }}
+                    title="Remove Item from Menu"
+                    className="text-red-600 hover:text-red-800 p-2 rounded-lg hover:bg-red-50 touch-manipulation min-h-[36px] min-w-[36px] flex items-center justify-center border border-red-200"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 </div>
               </div>
             )
@@ -432,20 +491,32 @@ export function AdminMenuManager({
                             type="button"
                             onClick={() => handleArchive(prod.id)}
                             title="Archive Product"
-                            className="text-[#A09289] hover:text-red-700 p-1 rounded"
+                            className="text-[#A09289] hover:text-amber-700 p-1.5 rounded hover:bg-amber-50 transition-colors"
                           >
-                            <Archive className="w-4 h-4" />
+                            <Archive className="w-3.5 h-3.5" />
                           </button>
                         ) : (
                           <button
                             type="button"
                             onClick={() => handleRestore(prod.id)}
                             title="Restore Product"
-                            className="text-[#737B52] hover:text-[#43291F] p-1 rounded"
+                            className="text-[#737B52] hover:text-[#43291F] p-1.5 rounded hover:bg-green-50 transition-colors"
                           >
-                            <RotateCcw className="w-4 h-4" />
+                            <RotateCcw className="w-3.5 h-3.5" />
                           </button>
                         )}
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setProductToDelete(prod)
+                            setShowDeleteConfirm(true)
+                          }}
+                          title="Remove Item from Menu"
+                          className="text-red-600 hover:text-red-800 p-1.5 rounded hover:bg-red-50 transition-colors"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
                       </div>
                     </td>
                   </tr>
@@ -493,6 +564,35 @@ export function AdminMenuManager({
               {loading ? "Creating Category..." : "Save Category"}
             </Button>
           </form>
+
+          {/* Existing Categories List */}
+          <div className="pt-4 border-t border-[#E8DED0] space-y-2">
+            <h4 className="font-semibold text-xs text-[#43291F]">Existing Categories ({categories.length})</h4>
+            <div className="max-h-48 overflow-y-auto space-y-1.5 pr-1">
+              {categories.map((c) => {
+                const count = products.filter((p) => p.category_id === c.id).length
+                return (
+                  <div key={c.id} className="flex items-center justify-between p-2 rounded bg-[#F8F3E9] text-xs">
+                    <span className="font-medium text-[#43291F]">{c.name}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] text-[#705B51]">{count} item{count !== 1 ? 's' : ''}</span>
+                      {count === 0 && (
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteCategory(c.id, c.name)}
+                          disabled={loading}
+                          className="text-red-600 hover:text-red-800 p-1 rounded hover:bg-red-50 transition-colors"
+                          title="Delete empty category"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
         </DialogContent>
       </Dialog>
 
@@ -795,6 +895,75 @@ export function AdminMenuManager({
           </DialogContent>
         </Dialog>
       )}
+
+      {/* ── DELETE PRODUCT CONFIRMATION MODAL ── */}
+      <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+        <DialogContent className="max-w-md w-full">
+          <DialogHeader>
+            <DialogTitle className="text-red-700 flex items-center gap-2">
+              <Trash2 className="w-5 h-5 text-red-600" />
+              Remove Product from Menu
+            </DialogTitle>
+          </DialogHeader>
+
+          {productToDelete && (
+            <div className="space-y-4 pt-2">
+              <p className="text-xs text-[#705B51]">
+                Are you sure you want to remove <strong className="text-[#43291F]">{productToDelete.name}</strong> from the cafe menu?
+              </p>
+
+              <div className="p-3 bg-[#F8F3E9] rounded-lg border border-[#E8DED0] text-xs space-y-1.5">
+                <div className="flex justify-between">
+                  <span className="text-[#705B51]">Category:</span>
+                  <span className="font-semibold text-[#43291F]">{productToDelete.menu_categories?.name || "General"}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#705B51]">Selling Price (SP):</span>
+                  <span className="font-semibold text-[#43291F] font-mono">{formatCurrency(productToDelete.base_price)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#705B51]">Manufacturing Cost (CP):</span>
+                  <span className="font-semibold text-[#705B51] font-mono">{formatCurrency(productToDelete.cost_price || 0)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#705B51]">Current Stock:</span>
+                  <span className="font-semibold text-[#43291F]">{productToDelete.current_stock ?? 0} units</span>
+                </div>
+              </div>
+
+              <div className="text-[11px] text-[#A09289] bg-[#FFFDF8] p-2.5 rounded border border-[#E8DED0]">
+                If this item has completed past sales or inward stock logs, it will be safely deactivated and archived so that historical sales reports remain completely intact. Unreferenced items will be permanently erased.
+              </div>
+
+              <div className="flex items-center justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    setShowDeleteConfirm(false)
+                    setProductToDelete(null)
+                  }}
+                  disabled={loading}
+                  className="text-xs border-[#E8DED0]"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="button"
+                  variant="destructive"
+                  size="sm"
+                  onClick={handleDeleteProduct}
+                  disabled={loading}
+                  className="text-xs bg-red-700 hover:bg-red-800 text-white font-bold"
+                >
+                  {loading ? "Removing..." : "Yes, Remove Item"}
+                </Button>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   )
 }

@@ -19,7 +19,6 @@ import {
   AlertTriangle,
   Menu,
   X,
-  Store,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { logoutAction } from "@/lib/actions/auth"
@@ -282,18 +281,6 @@ export function AdminSidebarNav({
                 </div>
               </Link>
             )}
-
-            {/* Switch to Counter POS Shortcut */}
-            <Link href="/pos">
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 px-2.5 text-xs border-[#E8DED0] text-[#43291F] hover:bg-[#F8F3E9] hidden sm:flex items-center gap-1.5"
-              >
-                <Store className="w-3.5 h-3.5 text-[#B56C4A]" />
-                <span>Open Counter POS</span>
-              </Button>
-            </Link>
           </div>
         </header>
 

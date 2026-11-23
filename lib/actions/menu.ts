@@ -120,6 +120,7 @@ export async function addProductAction(formData: FormData) {
   })
 
   revalidatePath('/admin/menu')
+  revalidatePath('/admin/inventory')
   revalidatePath('/pos')
   return { success: true, product: newProd }
 }
@@ -174,6 +175,7 @@ export async function updateProductAction(productId: string, formData: FormData)
   if (error) return { success: false, error: error.message }
 
   revalidatePath('/admin/menu')
+  revalidatePath('/admin/inventory')
   revalidatePath('/pos')
   return { success: true }
 }
@@ -191,6 +193,7 @@ export async function toggleProductAvailabilityAction(productId: string, isAvail
   if (error) return { success: false, error: error.message }
 
   revalidatePath('/admin/menu')
+  revalidatePath('/admin/inventory')
   revalidatePath('/pos')
   return { success: true }
 }
@@ -211,6 +214,7 @@ export async function archiveProductAction(productId: string) {
   if (error) return { success: false, error: error.message }
 
   revalidatePath('/admin/menu')
+  revalidatePath('/admin/inventory')
   revalidatePath('/pos')
   return { success: true }
 }
@@ -231,6 +235,7 @@ export async function restoreProductAction(productId: string) {
   if (error) return { success: false, error: error.message }
 
   revalidatePath('/admin/menu')
+  revalidatePath('/admin/inventory')
   revalidatePath('/pos')
   return { success: true }
 }
@@ -257,6 +262,116 @@ export async function addCategoryAction(name: string, displayOrder = 0) {
   if (error) return { success: false, error: error.message }
 
   revalidatePath('/admin/menu')
+  revalidatePath('/admin/inventory')
   revalidatePath('/pos')
   return { success: true, category: data }
+}
+
+export async function deleteProductAction(productId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Unauthorized' }
+
+  const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user.id).single()
+  if (profile?.role !== 'ADMIN') return { success: false, error: 'Admin permission required' }
+
+  // Check if product exists
+  const { data: prod } = await supabase.from('products').select('*').eq('id', productId).single()
+  if (!prod) return { success: false, error: 'Product not found' }
+
+  // Check if product has sales items or stock inwards
+  const { count: salesCount } = await supabase
+    .from('sale_items')
+    .select('*', { count: 'exact', head: true })
+    .eq('product_id', productId)
+
+  const { count: inwardsCount } = await supabase
+    .from('stock_inwards')
+    .select('*', { count: 'exact', head: true })
+    .eq('product_id', productId)
+
+  const hasHistory = (salesCount ?? 0) > 0 || (inwardsCount ?? 0) > 0
+
+  if (hasHistory) {
+    // Audit-safe deactivation: deactivate and hide from POS & active menu so historical billing remains intact
+    const { error } = await supabase
+      .from('products')
+      .update({ is_active: false, is_available: false })
+      .eq('id', productId)
+
+    if (error) return { success: false, error: error.message }
+
+    await supabase.from('audit_logs').insert({
+      shop_id: profile.shop_id,
+      user_id: user.id,
+      action_type: 'PRODUCT_ARCHIVED_ON_DELETE',
+      table_name: 'products',
+      record_id: productId,
+      old_value: { name: prod.name, base_price: prod.base_price },
+      new_value: { is_active: false, is_available: false, reason: 'Archived because historical sales/inward records exist' },
+    })
+
+    revalidatePath('/admin/menu')
+    revalidatePath('/admin/inventory')
+    revalidatePath('/pos')
+    return { 
+      success: true, 
+      action: 'archived', 
+      message: `Product "${prod.name}" has previous billing records, so it was safely removed from active menu and POS.` 
+    }
+  }
+
+  // Hard delete if no dependent financial history
+  await supabase.from('product_variants').delete().eq('product_id', productId)
+  await supabase.from('product_addons').delete().eq('product_id', productId)
+  await supabase.from('product_price_history').delete().eq('product_id', productId)
+  await supabase.from('product_wastage_logs').delete().eq('product_id', productId)
+
+  const { error: delError } = await supabase.from('products').delete().eq('id', productId)
+  if (delError) {
+    // Fallback to archiving if any unforeseen constraint exists
+    await supabase.from('products').update({ is_active: false, is_available: false }).eq('id', productId)
+    return { success: true, action: 'archived', message: `Product "${prod.name}" was deactivated and removed from active menu.` }
+  }
+
+  await supabase.from('audit_logs').insert({
+    shop_id: profile.shop_id,
+    user_id: user.id,
+    action_type: 'PRODUCT_DELETED',
+    table_name: 'products',
+    record_id: productId,
+    old_value: { name: prod.name, base_price: prod.base_price },
+  })
+
+  revalidatePath('/admin/menu')
+  revalidatePath('/admin/inventory')
+  revalidatePath('/pos')
+  return { success: true, action: 'deleted', message: `Product "${prod.name}" permanently deleted.` }
+}
+
+export async function deleteCategoryAction(categoryId: string) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return { success: false, error: 'Unauthorized' }
+
+  const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user.id).single()
+  if (profile?.role !== 'ADMIN') return { success: false, error: 'Admin permission required' }
+
+  // Check if any products exist under this category
+  const { count } = await supabase
+    .from('products')
+    .select('*', { count: 'exact', head: true })
+    .eq('category_id', categoryId)
+
+  if ((count ?? 0) > 0) {
+    return { success: false, error: 'Cannot delete category that contains products. Reassign or delete products first.' }
+  }
+
+  const { error } = await supabase.from('menu_categories').delete().eq('id', categoryId)
+  if (error) return { success: false, error: error.message }
+
+  revalidatePath('/admin/menu')
+  revalidatePath('/admin/inventory')
+  revalidatePath('/pos')
+  return { success: true }
 }
