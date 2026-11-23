@@ -71,9 +71,29 @@ export async function recordStockInwardAction(payload: {
     return { success: false, error: error.message }
   }
 
+  // Record audit log for Admin panel
+  await supabase.from('audit_logs').insert({
+    shop_id: profile.shop_id,
+    user_id: user.id,
+    action_type: 'STOCK_INWARD',
+    table_name: 'stock_inwards',
+    record_id: data.inward_id,
+    new_value: {
+      product_name: data.product_name,
+      quantity_added: payload.quantity,
+      new_stock: data.new_stock,
+      unit_cost: payload.unit_cost || 0,
+      total_cost: payload.quantity * (payload.unit_cost || 0),
+      supplier_name: payload.supplier_name || 'Direct Delivery',
+      invoice_ref: payload.invoice_ref || null,
+    },
+  })
+
   revalidatePath('/pos/stock')
   revalidatePath('/pos')
   revalidatePath('/admin/inventory')
+  revalidatePath('/admin/audit')
+  revalidatePath('/admin')
   return { success: true, result: data }
 }
 
@@ -83,19 +103,40 @@ export async function recordStockInwardAction(payload: {
 export async function getStockInwardsAction(limit = 100) {
   const supabase = await createClient()
 
+  // Avoid PostgREST PGRST200 join error on manager_id by querying products and resolving profiles safely
   const { data, error } = await supabase
     .from('stock_inwards')
     .select(`
       *,
-      products (name, base_price, cost_price),
-      profiles:manager_id (full_name)
+      products (name, base_price, cost_price)
     `)
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error) {
-    console.error('getStockInwardsAction error:', error.message)
+  if (error || !data) {
+    console.error('getStockInwardsAction error:', error?.message)
     return []
   }
-  return data || []
+
+  // Safely populate manager profile names
+  const managerIds = Array.from(new Set(data.map((d) => d.manager_id).filter(Boolean)))
+  let profileMap: Record<string, string> = {}
+  if (managerIds.length > 0) {
+    const { data: profs } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', managerIds)
+    if (profs) {
+      profs.forEach((p) => {
+        profileMap[p.id] = p.full_name
+      })
+    }
+  }
+
+  return data.map((item) => ({
+    ...item,
+    profiles: {
+      full_name: profileMap[item.manager_id] || 'Store Manager',
+    },
+  }))
 }

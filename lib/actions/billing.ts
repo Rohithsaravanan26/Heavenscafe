@@ -1,5 +1,6 @@
 'use server'
 
+import { revalidatePath } from 'next/cache'
 import { createClient } from '@/lib/supabase/server'
 import { CheckoutPayload, Sale } from '@/types/database'
 
@@ -332,12 +333,47 @@ export async function adjustProductStockAction(productId: string, adjustment: nu
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return { success: false, error: 'Unauthorized' }
 
-  const { data: prod } = await supabase.from('products').select('current_stock').eq('id', productId).single()
+  const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single()
+  const { data: prod } = await supabase.from('products').select('name, current_stock, cost_price').eq('id', productId).single()
   if (!prod) return { success: false, error: 'Product not found' }
 
   const newStock = Math.max(0, (prod.current_stock || 0) + adjustment)
   const { error } = await supabase.from('products').update({ current_stock: newStock }).eq('id', productId)
   if (error) return { success: false, error: error.message }
+
+  // If positive adjustment, also record in stock_inwards table
+  if (adjustment > 0 && profile?.shop_id) {
+    await supabase.from('stock_inwards').insert({
+      shop_id: profile.shop_id,
+      manager_id: user.id,
+      product_id: productId,
+      quantity: adjustment,
+      unit_cost: prod.cost_price || 0,
+      total_cost: adjustment * (prod.cost_price || 0),
+      supplier_name: 'Admin Quick Inward',
+      notes: 'Quick stock adjustment from Admin Inventory panel',
+    })
+  }
+
+  // Record in audit_logs
+  if (profile?.shop_id) {
+    await supabase.from('audit_logs').insert({
+      shop_id: profile.shop_id,
+      user_id: user.id,
+      action_type: adjustment > 0 ? 'STOCK_INWARD_ADMIN' : 'STOCK_ADJUSTMENT',
+      table_name: 'products',
+      record_id: productId,
+      old_value: { name: prod.name, stock: prod.current_stock },
+      new_value: { name: prod.name, stock: newStock, adjustment },
+    })
+  }
+
+  revalidatePath('/admin/inventory')
+  revalidatePath('/admin/audit')
+  revalidatePath('/admin')
+  revalidatePath('/pos/stock')
+  revalidatePath('/pos')
+
   return { success: true, newStock }
 }
 
