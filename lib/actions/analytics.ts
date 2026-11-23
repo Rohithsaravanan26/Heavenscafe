@@ -236,19 +236,49 @@ export async function getPaymentMethodDistribution() {
   }))
 }
 
-export async function getAuditLogs(limit = 50) {
+export async function getAuditLogs(limit = 100) {
   const supabase = await createClient()
 
   const { data, error } = await supabase
     .from('audit_logs')
-    .select(`
-      *,
-      profiles (full_name, role)
-    `)
+    .select('*')
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error) return []
-  return data
+  if (error || !data) {
+    console.error('getAuditLogs query error:', error)
+    return []
+  }
+
+  // Decouple profiles query to avoid PostgREST PGRST200 foreign-key schema cache issues
+  const userIds = Array.from(new Set(data.map((l: any) => l.user_id).filter(Boolean)))
+  let profileMap: Record<string, { full_name: string; role: string }> = {}
+
+  if (userIds.length > 0) {
+    const { data: profiles } = await supabase
+      .from('profiles')
+      .select('id, full_name, role')
+      .in('id', userIds)
+
+    if (profiles) {
+      profileMap = Object.fromEntries(
+        profiles.map((p: any) => [
+          p.id,
+          {
+            full_name: p.full_name || 'Staff Member',
+            role: p.role || 'STAFF',
+          },
+        ])
+      )
+    }
+  }
+
+  return data.map((log: any) => ({
+    ...log,
+    profiles: profileMap[log.user_id] || {
+      full_name: log.user_id ? 'Store Staff' : 'System Automation',
+      role: log.user_id ? 'STAFF' : 'SYSTEM',
+    },
+  }))
 }
 
