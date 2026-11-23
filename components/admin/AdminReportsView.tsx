@@ -4,15 +4,16 @@ import * as React from "react"
 import {
   FileBarChart,
   Printer,
-  Download,
   Calendar,
-  TrendingUp,
-  TrendingDown,
   ShoppingBag,
   CreditCard,
   Banknote,
   QrCode,
+  TrendingUp,
+  TrendingDown,
+  Trash2,
   DollarSign,
+  Percent,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
@@ -30,9 +31,20 @@ export function AdminReportsView({
   topProducts,
   paymentMethods,
 }: AdminReportsViewProps) {
+  const [period, setPeriod] = React.useState<"today" | "month">("month")
+
   const kpis = overviewData?.kpis || {}
-  const totalExpenses = overviewData?.total_expenses || 0
-  const netProfit = overviewData?.net_profit || 0
+  const isToday = period === "today"
+
+  // Period-dependent metrics
+  const sales = isToday ? Number(kpis.today_sales || 0) : Number(kpis.month_sales || 0)
+  const billsCount = isToday ? Number(kpis.today_bills || 0) : Number(kpis.month_bills || 0)
+  const cogs = isToday ? Number(overviewData?.today_cogs || 0) : Number(overviewData?.month_cogs || 0)
+  const grossProfit = Math.max(0, sales - cogs)
+  const wastageLoss = isToday ? Number(overviewData?.today_wastage_loss || 0) : Number(overviewData?.month_wastage_loss || 0)
+  const expenses = isToday ? Number(overviewData?.total_expenses || 0) / 30 : Number(overviewData?.total_expenses || 0)
+  const netProfit = grossProfit - wastageLoss - (isToday ? 0 : expenses)
+  const netMargin = sales > 0 ? ((netProfit / sales) * 100).toFixed(1) : "0.0"
 
   const handlePrint = () => {
     window.print()
@@ -44,14 +56,34 @@ export function AdminReportsView({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#43291F]">
-            Monthly Financial & P&L Statement
+            Commercial Reports &amp; P&amp;L Statement
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
-            Commercial profit analysis and performance breakdown for Heaven&apos;s Cafe
+            Real-time profit &amp; loss statement: Revenue, Manufacturing Costs (CP), Day-End Wastage Loss &amp; Net Profit
           </p>
         </div>
 
-        <div className="flex gap-2">
+        <div className="flex items-center gap-2">
+          {/* Period Filter Switcher */}
+          <div className="flex bg-[#EFE7DA] p-1 rounded-lg border border-[#E8DED0]">
+            <button
+              onClick={() => setPeriod("today")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                isToday ? "bg-[#43291F] text-white shadow-xs" : "text-[#705B51] hover:text-[#43291F]"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setPeriod("month")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                !isToday ? "bg-[#43291F] text-white shadow-xs" : "text-[#705B51] hover:text-[#43291F]"
+              }`}
+            >
+              This Month
+            </button>
+          </div>
+
           <Button
             size="sm"
             onClick={handlePrint}
@@ -63,48 +95,135 @@ export function AdminReportsView({
         </div>
       </div>
 
-      {/* P&L Financial Summary Card */}
-      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm">
-        <CardHeader className="border-b border-[#E8DED0] pb-3">
-          <CardTitle className="text-lg text-[#43291F] flex items-center gap-2">
+      {/* 4 Core Highlight Cards */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#737B52]">
+            {isToday ? "Today's Gross Sales" : "Monthly Gross Sales"}
+          </span>
+          <p className="font-serif text-2xl font-bold text-[#43291F] mt-1 font-mono">
+            {formatCurrency(sales)}
+          </p>
+          <p className="text-[11px] text-[#705B51] mt-0.5">{billsCount} completed bills</p>
+        </Card>
+
+        <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#705B51]">
+            Manufacturing Cost (COGS)
+          </span>
+          <p className="font-serif text-2xl font-bold text-[#705B51] mt-1 font-mono">
+            {formatCurrency(cogs)}
+          </p>
+          <p className="text-[11px] text-[#705B51] mt-0.5">Product unit cost of items sold</p>
+        </Card>
+
+        <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-red-700">
+            Day-End Wastage Loss
+          </span>
+          <p className="font-serif text-2xl font-bold text-red-700 mt-1 font-mono">
+            -{formatCurrency(wastageLoss)}
+          </p>
+          <p className="text-[11px] text-red-600 mt-0.5">Manager logged expired/spilled</p>
+        </Card>
+
+        <Card className="border-[#E8DED0] bg-[#FAF0EB] p-4 shadow-xs border-[#F3DDD2]">
+          <span className="text-[10px] font-bold uppercase tracking-wider text-[#B56C4A]">
+            Net Operating Profit
+          </span>
+          <p className={`font-serif text-2xl font-bold mt-1 font-mono ${netProfit >= 0 ? "text-emerald-800" : "text-red-700"}`}>
+            {formatCurrency(netProfit)}
+          </p>
+          <p className="text-[11px] text-[#705B51] mt-0.5">{netMargin}% net operating margin</p>
+        </Card>
+      </div>
+
+      {/* P&L Commercial Statement Table */}
+      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
+        <CardHeader className="border-b border-[#E8DED0] bg-[#F8F3E9] p-4">
+          <CardTitle className="text-base text-[#43291F] flex items-center gap-2">
             <FileBarChart className="w-5 h-5 text-[#B56C4A]" />
-            Profit & Loss Accounting Breakdown
+            Commercial Profit &amp; Loss Statement ({isToday ? "Today" : "This Month"})
           </CardTitle>
         </CardHeader>
 
         <CardContent className="p-6">
           <div className="space-y-3 text-sm">
-            {/* Gross Revenue */}
-            <div className="flex justify-between items-center py-2 border-b border-[#E8DED0]">
-              <span className="font-semibold text-[#43291F]">A. Total Gross Sales Revenue</span>
-              <span className="font-serif font-bold text-base text-[#43291F]">
-                {formatCurrency(kpis.month_sales || 0)}
-              </span>
-            </div>
-
-            {/* Operating Expenses */}
-            <div className="flex justify-between items-center py-2 border-b border-[#E8DED0] text-red-700">
-              <span>B. Less: Operating Expenses (Rent, Gas, Salaries, Maintenance)</span>
-              <span className="font-serif font-bold text-base">
-                - {formatCurrency(totalExpenses)}
-              </span>
-            </div>
-
-            {/* Net Profit */}
-            <div className="flex justify-between items-center py-3 bg-[#FAF0EB] px-4 rounded-xl border border-[#F3DDD2]">
+            {/* 1. Gross Revenue */}
+            <div className="flex justify-between items-center py-2.5 border-b border-[#E8DED0]">
               <div>
-                <span className="font-serif font-bold text-lg text-[#43291F] block">
-                  Net Commercial Operating Profit (A - B)
-                </span>
-                <span className="text-xs text-[#705B51]">
-                  Current calendar period net performance
+                <span className="font-semibold text-[#43291F] block">1. Gross Sales Revenue</span>
+                <span className="text-xs text-[#705B51]">Total revenue billed across all cashier counters</span>
+              </div>
+              <span className="font-serif font-bold text-base text-[#43291F] font-mono">
+                {formatCurrency(sales)}
+              </span>
+            </div>
+
+            {/* 2. COGS (Manufacturing Cost) */}
+            <div className="flex justify-between items-center py-2.5 border-b border-[#E8DED0] text-[#705B51]">
+              <div>
+                <span className="font-semibold block">2. Less: Cost of Goods Sold (COGS)</span>
+                <span className="text-xs text-[#A09289]">Total manufacturing cost of all products sold</span>
+              </div>
+              <span className="font-serif font-bold text-base font-mono text-red-700">
+                - {formatCurrency(cogs)}
+              </span>
+            </div>
+
+            {/* 3. Gross Operating Profit */}
+            <div className="flex justify-between items-center py-2.5 border-b border-[#E8DED0] bg-[#F8F3E9]/50 px-3 rounded-lg">
+              <div>
+                <span className="font-bold text-[#43291F] block">3. Gross Trading Margin (1 - 2)</span>
+                <span className="text-xs text-[#737B52]">Commercial profit before wastage &amp; overhead</span>
+              </div>
+              <span className="font-serif font-bold text-base text-[#737B52] font-mono">
+                {formatCurrency(grossProfit)}
+              </span>
+            </div>
+
+            {/* 4. Day-End Wastage Loss */}
+            <div className="flex justify-between items-center py-2.5 border-b border-[#E8DED0] text-red-700">
+              <div>
+                <span className="font-semibold block">4. Less: Day-End Product Wastage &amp; Spoilage</span>
+                <span className="text-xs text-red-600">Financial manufacturing loss from expired/damaged items</span>
+              </div>
+              <span className="font-serif font-bold text-base font-mono">
+                - {formatCurrency(wastageLoss)}
+              </span>
+            </div>
+
+            {/* 5. Operating Expenses */}
+            {!isToday && (
+              <div className="flex justify-between items-center py-2.5 border-b border-[#E8DED0] text-[#705B51]">
+                <div>
+                  <span className="font-semibold block">5. Less: Operating Expenses</span>
+                  <span className="text-xs text-[#A09289]">Rent, utility bills, maintenance &amp; store expenses</span>
+                </div>
+                <span className="font-serif font-bold text-base font-mono text-red-700">
+                  - {formatCurrency(expenses)}
                 </span>
               </div>
-              <span className={`font-serif text-2xl font-bold ${
-                netProfit >= 0 ? "text-emerald-800" : "text-red-700"
-              }`}>
-                {formatCurrency(netProfit)}
-              </span>
+            )}
+
+            {/* 6. Net Profit Final Row */}
+            <div className="flex justify-between items-center py-4 bg-[#FAF0EB] px-4 rounded-xl border border-[#F3DDD2] mt-2">
+              <div>
+                <span className="font-serif font-bold text-lg text-[#43291F] block">
+                  Net Commercial Operating Profit
+                </span>
+                <span className="text-xs text-[#705B51]">
+                  Final profit after manufacturing costs, day-end wastages &amp; operations
+                </span>
+              </div>
+              <div className="text-right">
+                <span className={`font-serif text-2xl font-bold font-mono block ${netProfit >= 0 ? "text-emerald-800" : "text-red-700"}`}>
+                  {formatCurrency(netProfit)}
+                </span>
+                <span className="text-xs font-bold text-[#737B52]">
+                  {netMargin}% Margin
+                </span>
+              </div>
             </div>
           </div>
         </CardContent>

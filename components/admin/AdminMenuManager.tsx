@@ -7,11 +7,12 @@ import {
   Edit2,
   Archive,
   RotateCcw,
-  CheckCircle,
-  XCircle,
   Search,
   FolderPlus,
   Boxes,
+  AlertTriangle,
+  TrendingUp,
+  Percent,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -52,6 +53,14 @@ export function AdminMenuManager({
   const [showEditProductModal, setShowEditProductModal] = React.useState(false)
   const [editingProduct, setEditingProduct] = React.useState<any | null>(null)
   const [showAddCategoryModal, setShowAddCategoryModal] = React.useState(false)
+
+  // Live calculation states for Add modal
+  const [addBasePrice, setAddBasePrice] = React.useState<number>(0)
+  const [addCostPrice, setAddCostPrice] = React.useState<number>(0)
+
+  // Live calculation states for Edit modal
+  const [editBasePrice, setEditBasePrice] = React.useState<number>(0)
+  const [editCostPrice, setEditCostPrice] = React.useState<number>(0)
 
   const [loading, setLoading] = React.useState(false)
   const [statusMsg, setStatusMsg] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null)
@@ -133,16 +142,23 @@ export function AdminMenuManager({
     }
   }
 
+  const openEditModal = (prod: any) => {
+    setEditingProduct(prod)
+    setEditBasePrice(Number(prod.base_price) || 0)
+    setEditCostPrice(Number(prod.cost_price) || 0)
+    setShowEditProductModal(true)
+  }
+
   return (
     <div className="space-y-6">
       {/* Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#43291F]">
-            Menu & Pricing Management
+            Menu, Costs &amp; Pricing
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
-            Manage catalogue, real selling prices, inventory recipes & availability
+            Configure Selling Price (SP), Manufacturing Cost (CP), profit margins and stock levels
           </p>
         </div>
 
@@ -159,7 +175,11 @@ export function AdminMenuManager({
 
           <Button
             size="sm"
-            onClick={() => setShowAddProductModal(true)}
+            onClick={() => {
+              setAddBasePrice(0)
+              setAddCostPrice(0)
+              setShowAddProductModal(true)
+            }}
             className="text-xs bg-[#43291F] hover:bg-[#341F17] text-white"
           >
             <Plus className="w-3.5 h-3.5 mr-1" />
@@ -216,7 +236,7 @@ export function AdminMenuManager({
         </div>
       </Card>
 
-      {/* Products Table */}
+      {/* Products Table with Selling Price, Manufacturing Cost, Profit & Stock */}
       <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
@@ -224,101 +244,114 @@ export function AdminMenuManager({
               <tr>
                 <th className="py-3 px-4">Item Name</th>
                 <th className="py-3 px-4">Category</th>
-                <th className="py-3 px-4">Selling Price</th>
-                <th className="py-3 px-4">Inventory Tracking</th>
-                <th className="py-3 px-4">Status</th>
+                <th className="py-3 px-4 text-right">Selling Price (SP)</th>
+                <th className="py-3 px-4 text-right">Mfg Cost (CP)</th>
+                <th className="py-3 px-4 text-right">Unit Profit &amp; Margin</th>
+                <th className="py-3 px-4 text-center">Stock Level</th>
                 <th className="py-3 px-4 text-center">Availability</th>
                 <th className="py-3 px-4 text-right">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E8DED0]">
-              {filteredProducts.map((prod) => (
-                <tr key={prod.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
-                  <td className="py-3.5 px-4 font-serif font-bold text-sm text-[#43291F]">
-                    {prod.name}
-                    {!prod.is_active && (
-                      <span className="ml-2 text-[10px] text-red-600 font-sans font-normal">
-                        (Archived)
-                      </span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <Badge variant="olive" className="text-[10px]">
-                      {prod.menu_categories?.name || "General"}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4 font-serif font-bold text-sm text-[#43291F]">
-                    {formatCurrency(prod.base_price)}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    {prod.track_inventory ? (
-                      <span className="flex items-center gap-1 text-[#737B52] font-semibold text-[11px]">
-                        <Boxes className="w-3.5 h-3.5" />
-                        Recipe Active
-                      </span>
-                    ) : (
-                      <span className="text-[#A09289] text-[11px]">Direct Item</span>
-                    )}
-                  </td>
-                  <td className="py-3.5 px-4">
-                    <Badge
-                      variant={prod.is_active ? "success" : "destructive"}
-                      className="text-[10px]"
-                    >
-                      {prod.is_active ? "Active" : "Archived"}
-                    </Badge>
-                  </td>
-                  <td className="py-3.5 px-4 text-center">
-                    <button
-                      type="button"
-                      onClick={() => handleToggleAvailability(prod.id, prod.is_available)}
-                      className={`px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-colors ${
-                        prod.is_available
-                          ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
-                          : "bg-red-100 text-red-800 hover:bg-red-200"
-                      }`}
-                    >
-                      {prod.is_available ? "In Stock" : "Unavailable"}
-                    </button>
-                  </td>
-                  <td className="py-3.5 px-4 text-right">
-                    <div className="flex items-center justify-end gap-1.5">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        onClick={() => {
-                          setEditingProduct(prod)
-                          setShowEditProductModal(true)
-                        }}
-                        className="h-7 text-xs border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F]"
-                      >
-                        <Edit2 className="w-3 h-3 mr-1" />
-                        Edit
-                      </Button>
+              {filteredProducts.map((prod) => {
+                const sp = Number(prod.base_price) || 0
+                const cp = Number(prod.cost_price) || 0
+                const unitProfit = sp - cp
+                const marginPct = sp > 0 ? ((unitProfit / sp) * 100).toFixed(0) : "0"
+                const stock = Number(prod.current_stock ?? 0)
+                const minStock = Number(prod.min_stock ?? 10)
+                const isLow = stock <= minStock
 
-                      {prod.is_active ? (
-                        <button
-                          type="button"
-                          onClick={() => handleArchive(prod.id)}
-                          title="Archive Product"
-                          className="text-[#A09289] hover:text-red-700 p-1 rounded"
-                        >
-                          <Archive className="w-4 h-4" />
-                        </button>
-                      ) : (
-                        <button
-                          type="button"
-                          onClick={() => handleRestore(prod.id)}
-                          title="Restore Product"
-                          className="text-[#737B52] hover:text-[#43291F] p-1 rounded"
-                        >
-                          <RotateCcw className="w-4 h-4" />
-                        </button>
+                return (
+                  <tr key={prod.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
+                    <td className="py-3.5 px-4 font-serif font-bold text-sm text-[#43291F]">
+                      {prod.name}
+                      {!prod.is_active && (
+                        <span className="ml-2 text-[10px] text-red-600 font-sans font-normal">
+                          (Archived)
+                        </span>
                       )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
+                    </td>
+                    <td className="py-3.5 px-4">
+                      <Badge variant="olive" className="text-[10px]">
+                        {prod.menu_categories?.name || "General"}
+                      </Badge>
+                    </td>
+                    <td className="py-3.5 px-4 font-bold text-sm text-[#43291F] text-right font-mono">
+                      {formatCurrency(sp)}
+                    </td>
+                    <td className="py-3.5 px-4 text-sm text-[#705B51] text-right font-mono">
+                      {formatCurrency(cp)}
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="font-bold text-[#737B52] font-mono">
+                        +{formatCurrency(unitProfit)}
+                      </div>
+                      <div className="text-[10px] text-[#A09289]">
+                        {marginPct}% margin
+                      </div>
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                          isLow
+                            ? "bg-red-100 text-red-800"
+                            : "bg-[#F0F1EA] text-[#737B52]"
+                        }`}
+                      >
+                        {isLow && <AlertTriangle className="w-3 h-3 text-red-600" />}
+                        {stock} units
+                      </span>
+                    </td>
+                    <td className="py-3.5 px-4 text-center">
+                      <button
+                        type="button"
+                        onClick={() => handleToggleAvailability(prod.id, prod.is_available)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-bold cursor-pointer transition-colors ${
+                          prod.is_available
+                            ? "bg-emerald-100 text-emerald-800 hover:bg-emerald-200"
+                            : "bg-red-100 text-red-800 hover:bg-red-200"
+                        }`}
+                      >
+                        {prod.is_available ? "In Stock" : "Unavailable"}
+                      </button>
+                    </td>
+                    <td className="py-3.5 px-4 text-right">
+                      <div className="flex items-center justify-end gap-1.5">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => openEditModal(prod)}
+                          className="h-7 text-xs border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F]"
+                        >
+                          <Edit2 className="w-3 h-3 mr-1" />
+                          Edit
+                        </Button>
+
+                        {prod.is_active ? (
+                          <button
+                            type="button"
+                            onClick={() => handleArchive(prod.id)}
+                            title="Archive Product"
+                            className="text-[#A09289] hover:text-red-700 p-1 rounded"
+                          >
+                            <Archive className="w-4 h-4" />
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => handleRestore(prod.id)}
+                            title="Restore Product"
+                            className="text-[#737B52] hover:text-[#43291F] p-1 rounded"
+                          >
+                            <RotateCcw className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
             </tbody>
           </table>
         </div>
@@ -364,7 +397,7 @@ export function AdminMenuManager({
         </DialogContent>
       </Dialog>
 
-      {/* ── ADD PRODUCT MODAL ── */}
+      {/* ── ADD PRODUCT MODAL (With Live Profit Calculator) ── */}
       <Dialog open={showAddProductModal} onOpenChange={setShowAddProductModal}>
         <DialogContent className="max-w-lg">
           <DialogHeader>
@@ -389,7 +422,7 @@ export function AdminMenuManager({
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5 col-span-2">
                 <Label htmlFor="prodName">Product Name *</Label>
-                <Input id="prodName" name="name" placeholder="e.g. Masala Chai" required />
+                <Input id="prodName" name="name" placeholder="e.g. Elaichi Tea" required />
               </div>
 
               <div className="space-y-1.5">
@@ -404,16 +437,71 @@ export function AdminMenuManager({
               </div>
 
               <div className="space-y-1.5">
-                <Label htmlFor="prodPrice">Price in INR (₹) *</Label>
+                <Label htmlFor="prodPrice">Selling Price (SP in ₹) *</Label>
                 <Input
                   id="prodPrice"
                   name="base_price"
                   type="number"
                   step="0.01"
                   min="0"
-                  placeholder="25.00"
+                  placeholder="30.00"
+                  onChange={(e) => setAddBasePrice(parseFloat(e.target.value) || 0)}
                   required
                 />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="prodCost">Manufacturing Cost (CP in ₹) *</Label>
+                <Input
+                  id="prodCost"
+                  name="cost_price"
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  placeholder="10.00"
+                  onChange={(e) => setAddCostPrice(parseFloat(e.target.value) || 0)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="initialStock">Initial Stock Units</Label>
+                <Input
+                  id="initialStock"
+                  name="current_stock"
+                  type="number"
+                  min="0"
+                  defaultValue="50"
+                  required
+                />
+              </div>
+
+              <div className="space-y-1.5">
+                <Label htmlFor="minStock">Low Stock Alert At (Units)</Label>
+                <Input
+                  id="minStock"
+                  name="min_stock"
+                  type="number"
+                  min="0"
+                  defaultValue="10"
+                  required
+                />
+              </div>
+
+              {/* LIVE COMMERCIAL PROFIT PREVIEW */}
+              <div className="col-span-2 p-3 rounded-lg bg-[#F8F3E9] border border-[#E8DED0]">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="text-[#705B51]">Unit Profit (SP - CP):</span>
+                  <span className="font-bold text-[#43291F] font-mono text-sm">
+                    {formatCurrency(Math.max(0, addBasePrice - addCostPrice))}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between text-xs mt-1">
+                  <span className="text-[#705B51]">Gross Profit Margin:</span>
+                  <span className="font-bold text-[#737B52]">
+                    {addBasePrice > 0 ? (((addBasePrice - addCostPrice) / addBasePrice) * 100).toFixed(1) : "0.0"}%
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-1.5 col-span-2">
@@ -421,22 +509,9 @@ export function AdminMenuManager({
                 <Textarea
                   id="prodDesc"
                   name="description"
-                  placeholder="Freshly brewed with ginger and cardamom..."
+                  placeholder="Freshly prepared with authentic ingredients..."
                   rows={2}
                 />
-              </div>
-
-              <div className="flex items-center gap-2 col-span-2 pt-1">
-                <input
-                  type="checkbox"
-                  id="trackInventory"
-                  name="track_inventory"
-                  value="true"
-                  className="rounded text-[#43291F]"
-                />
-                <Label htmlFor="trackInventory" className="text-xs cursor-pointer">
-                  Deduct Raw Ingredients via Recipe (Track Inventory)
-                </Label>
               </div>
             </div>
 
@@ -445,13 +520,13 @@ export function AdminMenuManager({
               disabled={loading}
               className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold"
             >
-              {loading ? "Adding Product..." : "Create Product"}
+              {loading ? "Adding Product..." : "Create Product with Cost & Stock"}
             </Button>
           </form>
         </DialogContent>
       </Dialog>
 
-      {/* ── EDIT PRODUCT MODAL ── */}
+      {/* ── EDIT PRODUCT MODAL (With Live Profit Calculator) ── */}
       {editingProduct && (
         <Dialog open={showEditProductModal} onOpenChange={setShowEditProductModal}>
           <DialogContent className="max-w-lg">
@@ -466,17 +541,29 @@ export function AdminMenuManager({
                 setLoading(false)
                 if (res.success) {
                   const updatedPrice = Number(formData.get('base_price'))
+                  const updatedCost = Number(formData.get('cost_price'))
+                  const updatedStock = Number(formData.get('current_stock'))
+                  const updatedMin = Number(formData.get('min_stock'))
                   const updatedName = formData.get('name') as string
                   const updatedCat = formData.get('category_id') as string
+
                   setProducts((prev) =>
                     prev.map((p) =>
                       p.id === editingProduct.id
-                        ? { ...p, name: updatedName, base_price: updatedPrice, category_id: updatedCat }
+                        ? {
+                            ...p,
+                            name: updatedName,
+                            base_price: updatedPrice,
+                            cost_price: updatedCost,
+                            current_stock: updatedStock,
+                            min_stock: updatedMin,
+                            category_id: updatedCat,
+                          }
                         : p
                     )
                   )
                   setShowEditProductModal(false)
-                  setStatusMsg({ type: 'success', text: `Product "${updatedName}" updated. Price history logged.` })
+                  setStatusMsg({ type: 'success', text: `Product "${updatedName}" updated successfully.` })
                 } else {
                   setStatusMsg({ type: 'error', text: res.error || 'Failed to update' })
                 }
@@ -511,7 +598,7 @@ export function AdminMenuManager({
                 </div>
 
                 <div className="space-y-1.5">
-                  <Label htmlFor="editPrice">Selling Price (₹) *</Label>
+                  <Label htmlFor="editPrice">Selling Price (SP in ₹) *</Label>
                   <Input
                     id="editPrice"
                     name="base_price"
@@ -519,8 +606,63 @@ export function AdminMenuManager({
                     step="0.01"
                     min="0"
                     defaultValue={editingProduct.base_price}
+                    onChange={(e) => setEditBasePrice(parseFloat(e.target.value) || 0)}
                     required
                   />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="editCost">Manufacturing Cost (CP in ₹) *</Label>
+                  <Input
+                    id="editCost"
+                    name="cost_price"
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    defaultValue={editingProduct.cost_price || 0}
+                    onChange={(e) => setEditCostPrice(parseFloat(e.target.value) || 0)}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="editStock">Current Stock Units</Label>
+                  <Input
+                    id="editStock"
+                    name="current_stock"
+                    type="number"
+                    min="0"
+                    defaultValue={editingProduct.current_stock ?? 50}
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1.5">
+                  <Label htmlFor="editMinStock">Low Stock Alert At</Label>
+                  <Input
+                    id="editMinStock"
+                    name="min_stock"
+                    type="number"
+                    min="0"
+                    defaultValue={editingProduct.min_stock ?? 10}
+                    required
+                  />
+                </div>
+
+                {/* LIVE COMMERCIAL PROFIT PREVIEW */}
+                <div className="col-span-2 p-3 rounded-lg bg-[#F8F3E9] border border-[#E8DED0]">
+                  <div className="flex items-center justify-between text-xs">
+                    <span className="text-[#705B51]">Unit Profit (SP - CP):</span>
+                    <span className="font-bold text-[#43291F] font-mono text-sm">
+                      {formatCurrency(Math.max(0, editBasePrice - editCostPrice))}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-xs mt-1">
+                    <span className="text-[#705B51]">Gross Profit Margin:</span>
+                    <span className="font-bold text-[#737B52]">
+                      {editBasePrice > 0 ? (((editBasePrice - editCostPrice) / editBasePrice) * 100).toFixed(1) : "0.0"}%
+                    </span>
+                  </div>
                 </div>
 
                 <div className="space-y-1.5 col-span-2">
@@ -528,7 +670,7 @@ export function AdminMenuManager({
                   <Input
                     id="priceReason"
                     name="price_change_reason"
-                    placeholder="e.g. Milk & dairy price increase"
+                    placeholder="e.g. Milk & dairy cost revision"
                   />
                 </div>
 
@@ -541,20 +683,6 @@ export function AdminMenuManager({
                     rows={2}
                   />
                 </div>
-
-                <div className="flex items-center gap-2 col-span-2 pt-1">
-                  <input
-                    type="checkbox"
-                    id="editTrack"
-                    name="track_inventory"
-                    value="true"
-                    defaultChecked={editingProduct.track_inventory}
-                    className="rounded text-[#43291F]"
-                  />
-                  <Label htmlFor="editTrack" className="text-xs cursor-pointer">
-                    Track Inventory with Recipe
-                  </Label>
-                </div>
               </div>
 
               <Button
@@ -562,7 +690,7 @@ export function AdminMenuManager({
                 disabled={loading}
                 className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold"
               >
-                {loading ? "Saving Changes..." : "Update Product & Log Price"}
+                {loading ? "Saving Changes..." : "Update Product & Save Costs"}
               </Button>
             </form>
           </DialogContent>

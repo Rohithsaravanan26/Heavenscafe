@@ -18,36 +18,50 @@ export async function getDashboardOverview() {
   if (profile?.role !== 'ADMIN') return null
 
   const shopId = profile.shop_id
-
-  // 1. Fetch real stored function KPIs
-  const { data: kpiData, error: kpiErr } = await supabase.rpc('get_dashboard_kpis', {
-    p_shop_id: shopId,
-  })
-
-  const kpis: DashboardKPIs = kpiData || {
-    today_sales: 0,
-    today_bills: 0,
-    month_sales: 0,
-    month_bills: 0,
-    avg_order_value: 0,
-    items_today: 0,
-    low_stock_count: 0,
-  }
-
-  // 2. Fetch monthly operating expenses
+  const todayStr = new Date().toISOString().split('T')[0]
   const currentMonthStart = new Date(new Date().getFullYear(), new Date().getMonth(), 1)
     .toISOString()
     .split('T')[0]
 
-  const { data: expenses } = await supabase
-    .from('expenses')
-    .select('amount')
+  // 1. Fetch Commercial Summary for Today
+  const { data: todaySummary } = await supabase.rpc('get_commercial_summary', {
+    p_shop_id: shopId,
+    p_start_date: todayStr,
+    p_end_date: todayStr,
+  })
+
+  // 2. Fetch Commercial Summary for This Month
+  const { data: monthSummary } = await supabase.rpc('get_commercial_summary', {
+    p_shop_id: shopId,
+    p_start_date: currentMonthStart,
+    p_end_date: todayStr,
+  })
+
+  // 3. Fallback or baseline KPIs
+  const kpis: DashboardKPIs = {
+    today_sales: Number(todaySummary?.gross_sales || 0),
+    today_bills: Number(todaySummary?.total_bills || 0),
+    month_sales: Number(monthSummary?.gross_sales || 0),
+    month_bills: Number(monthSummary?.total_bills || 0),
+    avg_order_value: Number(todaySummary?.avg_bill || 0),
+    items_today: 0,
+    low_stock_count: Number(todaySummary?.low_stock_count || 0),
+  }
+
+  // 4. Fetch low stock products (item-level)
+  const { data: lowStockProducts } = await supabase
+    .from('products')
+    .select('id, name, base_price, cost_price, current_stock, min_stock')
     .eq('shop_id', shopId)
-    .gte('expense_date', currentMonthStart)
+    .eq('is_active', true)
+    .eq('track_stock', true)
+    .order('current_stock', { ascending: true })
 
-  const totalExpenses = (expenses || []).reduce((sum, e) => sum + Number(e.amount || 0), 0)
+  const filteredLowStock = (lowStockProducts || []).filter(
+    (p) => Number(p.current_stock) <= Number(p.min_stock)
+  )
 
-  // 3. Fetch recent 7-day revenue trend
+  // 5. Recent 7-day trend
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   const { data: recentDays } = await supabase
     .from('daily_sales_summary')
@@ -56,25 +70,49 @@ export async function getDashboardOverview() {
     .gte('sale_date', sevenDaysAgo)
     .order('sale_date', { ascending: true })
 
-  // 4. Fetch low stock items
-  const { data: lowStockItems } = await supabase
-    .from('ingredients')
-    .select('id, name, unit, current_stock, min_stock')
-    .eq('shop_id', shopId)
-    .eq('is_active', true)
-    .filter('current_stock', 'lte', 'min_stock')
-    .limit(5)
-
-  // Net profit calculation = Month revenue - Month operating expenses
-  const netProfit = Number((kpis.month_sales - totalExpenses).toFixed(2))
-
   return {
     kpis,
-    total_expenses: totalExpenses,
-    net_profit: netProfit,
+    today_cogs: Number(todaySummary?.total_cogs || 0),
+    today_gross_profit: Number(todaySummary?.gross_profit || 0),
+    today_wastage_loss: Number(todaySummary?.wastage_loss || 0),
+    today_net_profit: Number(todaySummary?.net_profit || 0),
+    month_cogs: Number(monthSummary?.total_cogs || 0),
+    month_wastage_loss: Number(monthSummary?.wastage_loss || 0),
+    month_net_profit: Number(monthSummary?.net_profit || 0),
+    total_expenses: Number(monthSummary?.expenses || 0),
+    net_profit: Number(monthSummary?.net_profit || 0),
     recent_trend: recentDays || [],
-    low_stock_items: lowStockItems || [],
+    low_stock_items: filteredLowStock.slice(0, 10),
   }
+}
+
+export async function getProductStockList() {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return []
+
+  const { data: profile } = await supabase.from('profiles').select('shop_id').eq('id', user.id).single()
+  if (!profile) return []
+
+  const { data, error } = await supabase
+    .from('products')
+    .select(`
+      id,
+      name,
+      base_price,
+      cost_price,
+      current_stock,
+      min_stock,
+      track_stock,
+      is_available,
+      menu_categories (name)
+    `)
+    .eq('shop_id', profile.shop_id)
+    .eq('is_active', true)
+    .order('category_id')
+
+  if (error) return []
+  return data || []
 }
 
 export async function getSalesChartData(days = 14) {

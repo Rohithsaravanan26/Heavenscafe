@@ -3,70 +3,115 @@
 import * as React from "react"
 import {
   Boxes,
-  Plus,
   AlertTriangle,
-  History,
-  Truck,
-  ArrowDownRight,
-  ArrowUpRight,
+  Trash2,
   Search,
-  ShoppingCart,
-  Scale,
-  ClipboardCheck,
+  Plus,
+  Minus,
   CheckCircle2,
-  ShieldAlert,
+  DollarSign,
+  TrendingDown,
+  RefreshCw,
+  PackageCheck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Select } from "@/components/ui/select"
-import { Textarea } from "@/components/ui/textarea"
 import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Alert, AlertDescription } from "@/components/ui/alert"
-import { addIngredientAction, addSupplierAction } from "@/lib/actions/inventory"
+import { adjustProductStockAction } from "@/lib/actions/billing"
 import { formatCurrency, formatDateTime } from "@/lib/utils"
 
 interface AdminInventoryManagerProps {
-  ingredients: any[]
-  suppliers: any[]
-  movements: any[]
-  lowStockItems?: any[]
-  purchaseHistory?: any[]
-  usageLogs?: any[]
-  audits?: any[]
+  products: any[]
+  wastages: any[]
 }
 
 export function AdminInventoryManager({
-  ingredients: initialIngredients,
-  suppliers: initialSuppliers,
-  movements: initialMovements,
-  lowStockItems = [],
-  purchaseHistory = [],
-  usageLogs = [],
-  audits = [],
+  products: initialProducts,
+  wastages: initialWastages,
 }: AdminInventoryManagerProps) {
-  const [ingredients, setIngredients] = React.useState<any[]>(initialIngredients)
-  const [suppliers, setSuppliers] = React.useState<any[]>(initialSuppliers)
+  const [products, setProducts] = React.useState<any[]>(initialProducts)
+  const [wastages, setWastages] = React.useState<any[]>(initialWastages)
+  const [activeTab, setActiveTab] = React.useState<"stocks" | "wastage">("stocks")
   const [search, setSearch] = React.useState("")
-  const [activeTab, setActiveTab] = React.useState<
-    "alerts" | "ingredients" | "movements" | "purchases" | "usage" | "audits" | "suppliers"
-  >(lowStockItems.length > 0 ? "alerts" : "ingredients")
+  const [onlyLowStock, setOnlyLowStock] = React.useState(false)
 
-  // Modals
-  const [showAddIngModal, setShowAddIngModal] = React.useState(false)
-  const [showAddSupplierModal, setShowAddSupplierModal] = React.useState(false)
+  // Quick Stock Inward / Adjustment Modal
+  const [selectedProduct, setSelectedProduct] = React.useState<any | null>(null)
+  const [adjustmentAmount, setAdjustmentAmount] = React.useState<number>(10)
   const [loading, setLoading] = React.useState(false)
   const [statusMsg, setStatusMsg] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
 
-  const filteredIngredients = React.useMemo(() => {
-    return ingredients.filter((ing) =>
-      !search.trim() ||
-      ing.name.toLowerCase().includes(search.toLowerCase()) ||
-      ing.suppliers?.name?.toLowerCase().includes(search.toLowerCase())
-    )
-  }, [ingredients, search])
+  // Computed metrics
+  const lowStockItems = React.useMemo(() => {
+    return products.filter((p) => {
+      const stock = Number(p.current_stock ?? 0)
+      const min = Number(p.min_stock ?? 10)
+      return stock <= min
+    })
+  }, [products])
+
+  const totalCostValue = React.useMemo(() => {
+    return products.reduce((acc, p) => acc + (Number(p.current_stock ?? 0) * Number(p.cost_price ?? 0)), 0)
+  }, [products])
+
+  const totalSalesValue = React.useMemo(() => {
+    return products.reduce((acc, p) => acc + (Number(p.current_stock ?? 0) * Number(p.base_price ?? 0)), 0)
+  }, [products])
+
+  const todayStr = new Date().toISOString().split("T")[0]
+  const todayWastages = React.useMemo(() => {
+    return wastages.filter((w) => w.wastage_date === todayStr)
+  }, [wastages, todayStr])
+
+  const todayWastageLoss = React.useMemo(() => {
+    return todayWastages.reduce((acc, w) => acc + Number(w.total_cost_loss || 0), 0)
+  }, [todayWastages])
+
+  const totalWastageLoss = React.useMemo(() => {
+    return wastages.reduce((acc, w) => acc + Number(w.total_cost_loss || 0), 0)
+  }, [wastages])
+
+  const filteredProducts = React.useMemo(() => {
+    return products.filter((p) => {
+      const matchSearch =
+        !search.trim() ||
+        p.name.toLowerCase().includes(search.toLowerCase()) ||
+        p.menu_categories?.name?.toLowerCase().includes(search.toLowerCase())
+      const isLow = Number(p.current_stock ?? 0) <= Number(p.min_stock ?? 10)
+      const matchLow = onlyLowStock ? isLow : true
+      return matchSearch && matchLow
+    })
+  }, [products, search, onlyLowStock])
+
+  const handleQuickAdjust = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!selectedProduct || adjustmentAmount === 0) return
+
+    setLoading(true)
+    try {
+      const res = await adjustProductStockAction(selectedProduct.id, adjustmentAmount)
+      if (res.success) {
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === selectedProduct.id ? { ...p, current_stock: res.newStock } : p
+          )
+        )
+        setStatusMsg({
+          type: "success",
+          text: `Stock for "${selectedProduct.name}" updated to ${res.newStock} units (${adjustmentAmount > 0 ? `+${adjustmentAmount}` : adjustmentAmount}).`,
+        })
+        setSelectedProduct(null)
+      } else {
+        setStatusMsg({ type: "error", text: res.error || "Failed to adjust stock" })
+      }
+    } finally {
+      setLoading(false)
+    }
+  }
 
   return (
     <div className="space-y-6">
@@ -74,32 +119,42 @@ export function AdminInventoryManager({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#43291F]">
-            Inventory & Ingredients
+            Product Inventory &amp; Wastage
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
-            Track raw cafe materials, stock movements, consumption & suppliers
+            Billzgo-style product stock tracking, quick inward adjustments, and day-end manager wastage loss audits
           </p>
         </div>
 
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => setShowAddSupplierModal(true)}
-            className="text-xs border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F]"
+        {/* Tab Buttons */}
+        <div className="flex bg-[#EFE7DA] p-1 rounded-lg border border-[#E8DED0]">
+          <button
+            onClick={() => setActiveTab("stocks")}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === "stocks"
+                ? "bg-[#43291F] text-white shadow-xs"
+                : "text-[#705B51] hover:text-[#43291F]"
+            }`}
           >
-            <Truck className="w-3.5 h-3.5 mr-1 text-[#737B52]" />
-            Add Supplier
-          </Button>
-
-          <Button
-            size="sm"
-            onClick={() => setShowAddIngModal(true)}
-            className="text-xs bg-[#43291F] hover:bg-[#341F17] text-white"
+            <Boxes className="w-3.5 h-3.5" />
+            Product Stocks ({products.length})
+            {lowStockItems.length > 0 && (
+              <span className="w-4 h-4 rounded-full bg-red-600 text-white text-[10px] flex items-center justify-center font-bold">
+                {lowStockItems.length}
+              </span>
+            )}
+          </button>
+          <button
+            onClick={() => setActiveTab("wastage")}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === "wastage"
+                ? "bg-[#43291F] text-white shadow-xs"
+                : "text-[#705B51] hover:text-[#43291F]"
+            }`}
           >
-            <Plus className="w-3.5 h-3.5 mr-1" />
-            Add Raw Material
-          </Button>
+            <Trash2 className="w-3.5 h-3.5" />
+            Day-End Wastage &amp; Loss ({wastages.length})
+          </button>
         </div>
       </div>
 
@@ -109,849 +164,392 @@ export function AdminInventoryManager({
         </Alert>
       )}
 
-      {/* View Tabs */}
-      <div className="flex items-center gap-1 border-b border-[#E8DED0] pb-2">
-        <button
-          onClick={() => setActiveTab("alerts")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === "alerts"
-              ? "bg-red-700 text-white"
-              : "bg-red-50 text-red-700 hover:bg-red-100"
-          }`}
-        >
-          <AlertTriangle className="w-3.5 h-3.5" />
-          Low Stock Alerts
+      {/* ── TAB 1: PRODUCT STOCKS & QUICK INWARD ── */}
+      {activeTab === "stocks" && (
+        <div className="space-y-6">
+          {/* Key Metrics Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#737B52]">
+                Tracked Products
+              </span>
+              <p className="font-serif text-2xl font-bold text-[#43291F] mt-1 font-mono">
+                {products.length}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Finished cafe catalogue</p>
+            </Card>
+
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-red-700">
+                Low Stock Alerts
+              </span>
+              <p className="font-serif text-2xl font-bold text-red-700 mt-1 font-mono">
+                {lowStockItems.length}
+              </p>
+              <p className="text-[11px] text-red-600 mt-0.5">Requires immediate restock</p>
+            </Card>
+
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#737B52]">
+                Stock Value (Cost)
+              </span>
+              <p className="font-serif text-2xl font-bold text-[#43291F] mt-1 font-mono">
+                {formatCurrency(totalCostValue)}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Total manufacturing value</p>
+            </Card>
+
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#B56C4A]">
+                Sales Potential
+              </span>
+              <p className="font-serif text-2xl font-bold text-[#B56C4A] mt-1 font-mono">
+                {formatCurrency(totalSalesValue)}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Estimated gross retail value</p>
+            </Card>
+          </div>
+
+          {/* Low Stock Watchlist Banner */}
           {lowStockItems.length > 0 && (
-            <span className={`ml-0.5 px-1.5 py-0.5 rounded-full text-[10px] font-black ${activeTab === "alerts" ? "bg-white text-red-700" : "bg-red-700 text-white"}`}>
-              {lowStockItems.length}
-            </span>
-          )}
-        </button>
-        <button
-          onClick={() => setActiveTab("ingredients")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-            activeTab === "ingredients"
-              ? "bg-[#43291F] text-white"
-              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
-          }`}
-        >
-          Ingredients Stock ({ingredients.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab("purchases")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === "purchases"
-              ? "bg-[#43291F] text-white"
-              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
-          }`}
-        >
-          <ShoppingCart className="w-3.5 h-3.5" />
-          Stock Inward Verification ({purchaseHistory.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab("usage")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === "usage"
-              ? "bg-[#43291F] text-white"
-              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
-          }`}
-        >
-          <Scale className="w-3.5 h-3.5" />
-          Material Usage & Analysis ({usageLogs.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab("audits")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer flex items-center gap-1.5 ${
-            activeTab === "audits"
-              ? "bg-[#43291F] text-white"
-              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
-          }`}
-        >
-          <ClipboardCheck className="w-3.5 h-3.5" />
-          Stock Audits & Missing Items ({audits.length})
-        </button>
-
-        <button
-          onClick={() => setActiveTab("movements")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-            activeTab === "movements"
-              ? "bg-[#43291F] text-white"
-              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
-          }`}
-        >
-          Movements Log ({initialMovements.length})
-        </button>
-        <button
-          onClick={() => setActiveTab("suppliers")}
-          className={`px-4 py-2 rounded-lg text-xs font-bold transition-colors cursor-pointer ${
-            activeTab === "suppliers"
-              ? "bg-[#43291F] text-white"
-              : "bg-[#FFFDF8] text-[#705B51] hover:bg-[#EFE7DA]"
-          }`}
-        >
-          Suppliers ({suppliers.length})
-        </button>
-      </div>
-
-      {/* ── TAB 0: LOW STOCK ALERTS ── */}
-      {activeTab === "alerts" && (
-        <Card className="border-2 border-red-200 bg-red-50/40 shadow-sm overflow-hidden">
-          <CardHeader className="pb-2 pt-4 px-4">
-            <CardTitle className="text-sm font-serif font-bold text-red-800 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4" />
-              Restock Needed — {lowStockItems.length} ingredient{lowStockItems.length !== 1 ? "s" : ""} below minimum stock
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            {lowStockItems.length === 0 ? (
-              <div className="py-14 text-center text-[#A09289]">
-                <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-30 text-red-400" />
-                <p className="font-serif font-bold text-base text-[#43291F]">All Stock Levels Healthy</p>
-                <p className="text-xs text-[#705B51] mt-1">No ingredients are below their minimum threshold.</p>
+            <div className="p-4 rounded-xl bg-red-50 border border-red-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-red-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-red-700" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-red-950">
+                    Low Stock Alert — {lowStockItems.length} item{lowStockItems.length > 1 ? "s" : ""} at or below minimum threshold
+                  </p>
+                  <p className="text-[11px] text-red-800 mt-0.5">
+                    {lowStockItems.slice(0, 4).map((p) => `${p.name} (${p.current_stock} left)`).join(", ")}
+                    {lowStockItems.length > 4 ? "..." : ""}
+                  </p>
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
-                  <thead className="bg-red-100 border-b border-red-200 font-serif font-bold text-red-900">
-                    <tr>
-                      <th className="py-3 px-4">Name</th>
-                      <th className="py-3 px-4">Current</th>
-                      <th className="py-3 px-4">Minimum</th>
-                      <th className="py-3 px-4">Shortfall</th>
-                      <th className="py-3 px-4">Supplier</th>
-                      <th className="py-3 px-4 text-right">Status</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-red-100">
-                    {lowStockItems.map((item) => {
-                      const shortfall = Math.max(0, Number(item.min_stock) - Number(item.current_stock))
-                      const isOut = Number(item.current_stock) <= 0
-                      const isCritical = Number(item.current_stock) <= Number(item.min_stock) * 0.5
-                      return (
-                        <tr key={item.id} className="hover:bg-red-50 transition-colors">
-                          <td className="py-3 px-4 font-bold text-[#43291F]">{item.name}</td>
-                          <td className="py-3 px-4 font-mono text-red-700 font-semibold">
-                            {item.current_stock} {item.unit}
-                          </td>
-                          <td className="py-3 px-4 text-[#705B51]">
-                            {item.min_stock} {item.unit}
-                          </td>
-                          <td className="py-3 px-4 font-bold text-red-800">
-                            {shortfall.toFixed(2)} {item.unit}
-                          </td>
-                          <td className="py-3 px-4 text-[#705B51]">
-                            {item.suppliers?.name || "Direct Purchase"}
-                            {item.suppliers?.phone && (
-                              <span className="block font-mono text-[10px] text-[#A09289]">{item.suppliers.phone}</span>
-                            )}
-                          </td>
-                          <td className="py-3 px-4 text-right">
-                            <Badge
-                              variant={isOut ? "destructive" : isCritical ? "destructive" : "warning"}
-                              className="text-[10px]"
-                            >
-                              {isOut ? "Out of Stock" : isCritical ? "Critical Low" : "Low Stock"}
-                            </Badge>
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setOnlyLowStock(!onlyLowStock)}
+                className="text-xs border-red-300 text-red-800 hover:bg-red-100"
+              >
+                {onlyLowStock ? "Show All Products" : "Filter Low Stock Items"}
+              </Button>
+            </div>
+          )}
+
+          {/* Search & Filter Bar */}
+          <Card className="border-[#E8DED0] bg-[#FFFDF8] p-3 shadow-xs">
+            <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
+              <div className="relative w-full sm:w-80">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A09289]" />
+                <Input
+                  placeholder="Search products..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-9 text-xs h-9 bg-[#F8F3E9]"
+                />
+              </div>
+
+              <div className="flex items-center gap-2">
+                <label className="flex items-center gap-1.5 text-xs text-[#705B51] cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={onlyLowStock}
+                    onChange={(e) => setOnlyLowStock(e.target.checked)}
+                    className="rounded text-red-600"
+                  />
+                  Only Low Stock ({lowStockItems.length})
+                </label>
+              </div>
+            </div>
+          </Card>
+
+          {/* Product Stocks Table */}
+          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
+                  <tr>
+                    <th className="py-3 px-4">Item Name</th>
+                    <th className="py-3 px-4">Category</th>
+                    <th className="py-3 px-4 text-right">Selling Price</th>
+                    <th className="py-3 px-4 text-right">Mfg Cost (CP)</th>
+                    <th className="py-3 px-4 text-center">Current Stock</th>
+                    <th className="py-3 px-4 text-center">Min Alert</th>
+                    <th className="py-3 px-4 text-right">Stock Valuation</th>
+                    <th className="py-3 px-4 text-right">Quick Inward</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E8DED0]">
+                  {filteredProducts.map((p) => {
+                    const stock = Number(p.current_stock ?? 0)
+                    const min = Number(p.min_stock ?? 10)
+                    const cp = Number(p.cost_price ?? 0)
+                    const sp = Number(p.base_price ?? 0)
+                    const isLow = stock <= min
+
+                    return (
+                      <tr key={p.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
+                        <td className="py-3 px-4 font-serif font-bold text-sm text-[#43291F]">
+                          {p.name}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant="olive" className="text-[10px]">
+                            {p.menu_categories?.name || "General"}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-[#43291F]">
+                          {formatCurrency(sp)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-[#705B51]">
+                          {formatCurrency(cp)}
+                        </td>
+                        <td className="py-3 px-4 text-center">
+                          <span
+                            className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-[11px] font-bold ${
+                              isLow
+                                ? "bg-red-100 text-red-800"
+                                : "bg-[#F0F1EA] text-[#737B52]"
+                            }`}
+                          >
+                            {isLow && <AlertTriangle className="w-3 h-3 text-red-600" />}
+                            {stock} units
+                          </span>
+                        </td>
+                        <td className="py-3 px-4 text-center text-[#A09289] font-mono">
+                          {min} units
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-[#43291F]">
+                          {formatCurrency(stock * cp)}
+                        </td>
+                        <td className="py-3 px-4 text-right">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => {
+                              setSelectedProduct(p)
+                              setAdjustmentAmount(10)
+                            }}
+                            className="h-7 text-xs border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F]"
+                          >
+                            <PackageCheck className="w-3 h-3 mr-1 text-[#737B52]" />
+                            Adjust / Inward
+                          </Button>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredProducts.length === 0 && (
+              <div className="py-12 text-center text-[#A09289]">
+                <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                <p className="font-serif font-bold text-base text-[#43291F]">No Products Found</p>
+                <p className="text-xs text-[#705B51] mt-1">Try adjusting your search query.</p>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </Card>
+        </div>
       )}
 
-      {/* ── TAB 1: INGREDIENTS TABLE ── */}
-      {activeTab === "ingredients" && (
-        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-          <div className="p-3 border-b border-[#E8DED0] flex items-center justify-between">
-            <div className="relative w-72">
-              <Search className="absolute left-3 top-2.5 h-4 w-4 text-[#A09289]" />
-              <Input
-                placeholder="Search raw ingredient..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="pl-9 text-xs h-9 bg-[#F8F3E9]"
-              />
-            </div>
-            <span className="text-xs text-[#705B51]">
-              {ingredients.filter((i) => i.current_stock <= i.min_stock).length} items below minimum stock
-            </span>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
-                <tr>
-                  <th className="py-3 px-4">Ingredient Name</th>
-                  <th className="py-3 px-4">Unit</th>
-                  <th className="py-3 px-4">Current Stock</th>
-                  <th className="py-3 px-4">Minimum Threshold</th>
-                  <th className="py-3 px-4">Est. Cost / Unit</th>
-                  <th className="py-3 px-4">Preferred Supplier</th>
-                  <th className="py-3 px-4 text-right">Stock Health</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8DED0]">
-                {filteredIngredients.map((ing) => {
-                  const isLow = Number(ing.current_stock) <= Number(ing.min_stock)
-                  const isCritical = Number(ing.current_stock) <= Number(ing.min_stock) * 0.5
-                  const isOut = Number(ing.current_stock) <= 0
-                  return (
-                    <tr key={ing.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
-                      <td className="py-3.5 px-4 font-bold text-[#43291F] text-sm">
-                        {ing.name}
-                      </td>
-                      <td className="py-3.5 px-4 uppercase font-mono text-[#705B51]">
-                        {ing.unit}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold font-serif text-sm text-[#43291F]">
-                        {ing.current_stock} {ing.unit}
-                      </td>
-                      <td className="py-3.5 px-4 text-[#705B51]">
-                        {ing.min_stock} {ing.unit}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        {ing.cost_per_unit ? formatCurrency(ing.cost_per_unit) : "—"}
-                      </td>
-                      <td className="py-3.5 px-4 text-[#705B51]">
-                        {ing.suppliers?.name || "Direct Purchase"}
-                      </td>
-                      <td className="py-3.5 px-4 text-right">
-                        <Badge
-                          variant={isOut ? "destructive" : isCritical ? "destructive" : isLow ? "warning" : "success"}
-                          className="text-[10px]"
-                        >
-                          {isOut ? "Out of Stock" : isCritical ? "Critical Low" : isLow ? "Low Stock" : "Healthy"}
-                        </Badge>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {filteredIngredients.length === 0 && (
-            <div className="py-14 text-center text-[#A09289]">
-              <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="font-serif font-bold text-base text-[#43291F]">No Raw Materials Added</p>
-              <p className="text-xs text-[#705B51] mt-1">
-                Add milk, sugar, tea powder, coffee, and cups to begin tracking cafe stock.
+      {/* ── TAB 2: DAY-END WASTAGE & LOSS LOG ── */}
+      {activeTab === "wastage" && (
+        <div className="space-y-6">
+          {/* Wastage Summary Cards */}
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-red-700">
+                Today&apos;s Wastage Loss
+              </span>
+              <p className="font-serif text-2xl font-bold text-red-700 mt-1 font-mono">
+                {formatCurrency(todayWastageLoss)}
               </p>
-            </div>
-          )}
-        </Card>
-      )}
+              <p className="text-[11px] text-[#705B51] mt-0.5">
+                {todayWastages.length} product entries today
+              </p>
+            </Card>
 
-      {/* ── TAB 2: STOCK MOVEMENTS ── */}
-      {activeTab === "movements" && (
-        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
-                <tr>
-                  <th className="py-3 px-4">Timestamp</th>
-                  <th className="py-3 px-4">Ingredient</th>
-                  <th className="py-3 px-4">Type</th>
-                  <th className="py-3 px-4">Quantity Change</th>
-                  <th className="py-3 px-4">Balance After</th>
-                  <th className="py-3 px-4">Reason / Reference</th>
-                  <th className="py-3 px-4 text-right">Logged By</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8DED0]">
-                {initialMovements.map((m) => {
-                  const isPositive = Number(m.quantity) > 0
-                  return (
-                    <tr key={m.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
-                      <td className="py-3.5 px-4 text-[#705B51]">
-                        {formatDateTime(m.created_at)}
-                      </td>
-                      <td className="py-3.5 px-4 font-bold text-[#43291F]">
-                        {m.ingredients?.name || "Item"}
-                      </td>
-                      <td className="py-3.5 px-4">
-                        <Badge
-                          variant={
-                            m.movement_type === "purchase"
-                              ? "success"
-                              : m.movement_type === "wastage"
-                              ? "destructive"
-                              : "secondary"
-                          }
-                          className="capitalize text-[10px]"
-                        >
-                          {m.movement_type.replace("_", " ")}
-                        </Badge>
-                      </td>
-                      <td className={`py-3.5 px-4 font-bold ${isPositive ? "text-emerald-700" : "text-red-700"}`}>
-                        {isPositive ? `+${m.quantity}` : m.quantity} {m.ingredients?.unit}
-                      </td>
-                      <td className="py-3.5 px-4 text-[#705B51]">
-                        {m.stock_after} {m.ingredients?.unit}
-                      </td>
-                      <td className="py-3.5 px-4 text-[#705B51]">
-                        {m.reason || "Automatic operation"}
-                      </td>
-                      <td className="py-3.5 px-4 text-right font-semibold text-[#43291F]">
-                        {m.profiles?.full_name || "Manager"}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#705B51]">
+                Today&apos;s Units Wasted
+              </span>
+              <p className="font-serif text-2xl font-bold text-[#43291F] mt-1 font-mono">
+                {todayWastages.reduce((acc, w) => acc + Number(w.quantity || 0), 0)}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Logged by managers at day end</p>
+            </Card>
+
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-red-700">
+                Total Recorded Loss
+              </span>
+              <p className="font-serif text-2xl font-bold text-red-700 mt-1 font-mono">
+                {formatCurrency(totalWastageLoss)}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Deducted from operating profit</p>
+            </Card>
+
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#737B52]">
+                Total Wastage Entries
+              </span>
+              <p className="font-serif text-2xl font-bold text-[#43291F] mt-1 font-mono">
+                {wastages.length}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Full audit trail</p>
+            </Card>
           </div>
 
-          {initialMovements.length === 0 && (
-            <div className="py-14 text-center text-[#A09289]">
-              <History className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="font-serif font-bold text-base text-[#43291F]">No Stock Movements Logged</p>
-              <p className="text-xs text-[#705B51] mt-1">
-                Stock changes from purchases, recipes, and wastage will be recorded here.
-              </p>
-            </div>
-          )}
-        </Card>
-      )}
+          {/* Wastage History Table */}
+          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
+            <CardHeader className="p-4 border-b border-[#E8DED0] bg-[#F8F3E9]">
+              <CardTitle className="font-serif text-base font-bold text-[#43291F]">
+                Manager Day-End Wastage Logs
+              </CardTitle>
+            </CardHeader>
 
-      {/* ── TAB 3: SUPPLIERS DIRECTORY ── */}
-      {activeTab === "suppliers" && (
-        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
-                <tr>
-                  <th className="py-3 px-4">Supplier Name</th>
-                  <th className="py-3 px-4">Phone Number</th>
-                  <th className="py-3 px-4">Email</th>
-                  <th className="py-3 px-4">Address / Market</th>
-                  <th className="py-3 px-4 text-right">Remarks</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8DED0]">
-                {suppliers.map((s) => (
-                  <tr key={s.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
-                    <td className="py-3.5 px-4 font-bold text-[#43291F] text-sm">
-                      {s.name}
-                    </td>
-                    <td className="py-3.5 px-4 font-mono text-[#705B51]">
-                      {s.phone || "—"}
-                    </td>
-                    <td className="py-3.5 px-4 text-[#705B51]">
-                      {s.email || "—"}
-                    </td>
-                    <td className="py-3.5 px-4 text-[#705B51]">
-                      {s.address || "—"}
-                    </td>
-                    <td className="py-3.5 px-4 text-right text-[#A09289]">
-                      {s.notes || "—"}
-                    </td>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F8F3E9]/50 border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
+                  <tr>
+                    <th className="py-3 px-4">Date &amp; Time</th>
+                    <th className="py-3 px-4">Product Name</th>
+                    <th className="py-3 px-4 text-center">Units Wasted</th>
+                    <th className="py-3 px-4 text-right">Cost Price (CP)</th>
+                    <th className="py-3 px-4 text-right">Financial Loss</th>
+                    <th className="py-3 px-4">Reason</th>
+                    <th className="py-3 px-4">Logged By</th>
+                    <th className="py-3 px-4">Notes</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody className="divide-y divide-[#E8DED0]">
+                  {wastages.map((w) => {
+                    const loss = Number(w.total_cost_loss || 0)
+                    const cp = Number(w.cost_price || 0)
 
-          {suppliers.length === 0 && (
-            <div className="py-14 text-center text-[#A09289]">
-              <Truck className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="font-serif font-bold text-base text-[#43291F]">No Suppliers Configured</p>
-              <p className="text-xs text-[#705B51] mt-1">
-                Add dairy, bakery, and produce suppliers to streamline inward stock receipts.
-              </p>
+                    return (
+                      <tr key={w.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
+                        <td className="py-3 px-4 text-[#705B51] whitespace-nowrap">
+                          {formatDateTime(w.created_at)}
+                        </td>
+                        <td className="py-3 px-4 font-serif font-bold text-sm text-[#43291F]">
+                          {w.products?.name || "Product"}
+                        </td>
+                        <td className="py-3 px-4 text-center font-bold text-red-700">
+                          {w.quantity} units
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono text-[#705B51]">
+                          {formatCurrency(cp)}
+                        </td>
+                        <td className="py-3 px-4 text-right font-mono font-bold text-red-700">
+                          -{formatCurrency(loss)}
+                        </td>
+                        <td className="py-3 px-4">
+                          <Badge variant="outline" className="text-[10px] capitalize">
+                            {w.reason?.replace("_", " ") || "Expired"}
+                          </Badge>
+                        </td>
+                        <td className="py-3 px-4 text-[#705B51]">
+                          {w.profiles?.full_name || "Manager"}
+                        </td>
+                        <td className="py-3 px-4 text-[#705B51] max-w-xs truncate">
+                          {w.notes || "—"}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             </div>
-          )}
-        </Card>
+
+            {wastages.length === 0 && (
+              <div className="py-14 text-center text-[#A09289]">
+                <Trash2 className="w-8 h-8 mx-auto mb-2 opacity-40 text-[#737B52]" />
+                <p className="font-serif font-bold text-base text-[#43291F]">No Wastage Logged</p>
+                <p className="text-xs text-[#705B51] mt-1">
+                  Managers log end-of-day expired or damaged items from the POS Wastage tab.
+                </p>
+              </div>
+            )}
+          </Card>
+        </div>
       )}
 
-      {/* ── TAB 4: PURCHASE INWARDS & VERIFICATION (Admin cross-verify) ── */}
-      {activeTab === "purchases" && (
-        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-[#E8DED0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-bold font-serif text-[#43291F]">
-                Stock Inward Verification & Discrepancy Log
-              </p>
-              <p className="text-xs text-[#705B51] mt-0.5">
-                Cross-verify supplier bills against physical stock counted at the store. Missing items or supplier short-deliveries are flagged.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-[#705B51]">
-                Total Deliveries: {purchaseHistory.length}
-              </span>
-            </div>
-          </div>
+      {/* ── QUICK STOCK INWARD / ADJUSTMENT MODAL ── */}
+      {selectedProduct && (
+        <Dialog open={!!selectedProduct} onOpenChange={() => setSelectedProduct(null)}>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Stock Inward / Adjustment: {selectedProduct.name}</DialogTitle>
+            </DialogHeader>
 
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
-                <tr>
-                  <th className="py-3 px-4">Date & Time</th>
-                  <th className="py-3 px-4">Supplier & Bill No.</th>
-                  <th className="py-3 px-4">Items: Billed vs Physical Received</th>
-                  <th className="py-3 px-4">Physical Total</th>
-                  <th className="py-3 px-4 text-center">Verification Status</th>
-                  <th className="py-3 px-4 text-right">Delivery Notes</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8DED0]">
-                {purchaseHistory.map((po) => {
-                  const hasDisc = po.has_discrepancy || po.purchase_items?.some((pi: any) => (pi.discrepancy_quantity && Number(pi.discrepancy_quantity) < -0.001))
-                  return (
-                    <tr key={po.id} className={`hover:bg-[#F8F3E9]/50 transition-colors ${hasDisc ? "bg-red-50/30" : ""}`}>
-                      <td className="py-3 px-4 text-[#705B51] whitespace-nowrap">
-                        {formatDateTime(po.created_at)}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-[#43291F]">
-                        {po.suppliers?.name || "Direct Purchase"}
-                        <span className="block font-mono text-[10px] text-[#705B51]">
-                          Ref: {po.reference_no || "No Bill #"}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        <div className="space-y-1.5 py-1">
-                          {po.purchase_items?.map((pi: any) => {
-                            const pQty = pi.quantity_purchased ?? pi.quantity
-                            const rQty = pi.quantity_received ?? pi.quantity
-                            const diff = Number(rQty) - Number(pQty)
-                            const isMissing = diff < -0.001
+            <form onSubmit={handleQuickAdjust} className="space-y-4 pt-2">
+              <div className="p-3 rounded-lg bg-[#F8F3E9] border border-[#E8DED0] space-y-1">
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#705B51]">Current Stock:</span>
+                  <span className="font-bold text-[#43291F] font-mono">{selectedProduct.current_stock ?? 0} units</span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-[#705B51]">Unit Cost (CP):</span>
+                  <span className="font-bold text-[#43291F] font-mono">{formatCurrency(selectedProduct.cost_price || 0)}</span>
+                </div>
+              </div>
 
-                            return (
-                              <div key={pi.id} className="text-[11px]">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="font-semibold text-[#43291F]">{pi.ingredients?.name}</span>
-                                  <span className="text-[#705B51]">
-                                    (Billed: {pQty} {pi.ingredients?.unit} &bull; Physical: {rQty} {pi.ingredients?.unit})
-                                  </span>
-                                  {isMissing ? (
-                                    <Badge variant="destructive" className="text-[9px] px-1.5 py-0">
-                                      {diff.toFixed(2)} {pi.ingredients?.unit} Missing
-                                    </Badge>
-                                  ) : (
-                                    <Badge variant="olive" className="text-[9px] px-1.5 py-0">
-                                      Matched
-                                    </Badge>
-                                  )}
-                                </div>
-                                {pi.discrepancy_reason && (
-                                  <span className="text-[10px] text-red-600 block pl-1 italic">
-                                    Reason: &quot;{pi.discrepancy_reason}&quot;
-                                  </span>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
-                      </td>
-                      <td className="py-3 px-4 font-bold font-serif text-[#43291F] whitespace-nowrap">
-                        {po.total_cost > 0 ? formatCurrency(po.total_cost) : "—"}
-                      </td>
-                      <td className="py-3 px-4 text-center">
-                        {hasDisc ? (
-                          <Badge variant="destructive" className="text-[10px] gap-1 inline-flex items-center">
-                            <AlertTriangle className="w-3 h-3" />
-                            Missing Stock Flagged
-                          </Badge>
-                        ) : (
-                          <Badge variant="olive" className="text-[10px] gap-1 inline-flex items-center">
-                            <CheckCircle2 className="w-3 h-3" />
-                            Verified & Matched
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-right text-[#A09289] text-[11px]">
-                        {po.notes || "—"}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {purchaseHistory.length === 0 && (
-            <div className="py-14 text-center text-[#A09289]">
-              <ShoppingCart className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="font-serif font-bold text-base text-[#43291F]">No Purchase Records Yet</p>
-              <p className="text-xs text-[#705B51] mt-1">
-                Stock inward receipts submitted by the store manager will appear here for admin cross-verification.
-              </p>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* ── TAB 5: MATERIAL USAGE & ANOMALY ANALYSIS ── */}
-      {activeTab === "usage" && (
-        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-[#E8DED0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-bold font-serif text-[#43291F]">
-                Raw Material Consumption & Average Usage Analysis
-              </p>
-              <p className="text-xs text-[#705B51] mt-0.5">
-                Automatically monitors store raw material consumption against product sales recipes to detect over-portioning or spillage.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-[#705B51]">
-                Total Reports: {usageLogs.length}
-              </span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
-                <tr>
-                  <th className="py-3 px-4">Date & Time</th>
-                  <th className="py-3 px-4">Raw Ingredient</th>
-                  <th className="py-3 px-4">Reported Usage</th>
-                  <th className="py-3 px-4">Sales Benchmark</th>
-                  <th className="py-3 px-4">Variance (%)</th>
-                  <th className="py-3 px-4">Consumption Status</th>
-                  <th className="py-3 px-4">Manager Explanation</th>
-                  <th className="py-3 px-4 text-right">Reported By</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8DED0]">
-                {usageLogs.map((log) => {
-                  const isHigh = log.status === "high_variance"
-                  const isLow = log.status === "low_variance"
-
-                  return (
-                    <tr
-                      key={log.id}
-                      className={`hover:bg-[#F8F3E9]/50 transition-colors ${
-                        isHigh ? "bg-red-50/40" : isLow ? "bg-amber-50/30" : ""
-                      }`}
+              <div className="space-y-1.5">
+                <Label htmlFor="adjAmount">Quantity to Inward / Adjust (+ / -)</Label>
+                <div className="flex items-center gap-2">
+                  <Input
+                    id="adjAmount"
+                    type="number"
+                    value={adjustmentAmount}
+                    onChange={(e) => setAdjustmentAmount(parseInt(e.target.value, 10) || 0)}
+                    required
+                    className="font-mono text-base font-bold"
+                  />
+                </div>
+                <div className="flex gap-2 pt-1">
+                  {[+10, +25, +50, +100, -5].map((amt) => (
+                    <button
+                      key={amt}
+                      type="button"
+                      onClick={() => setAdjustmentAmount(amt)}
+                      className="px-2.5 py-1 rounded bg-[#EFE7DA] text-xs font-bold text-[#43291F] hover:bg-[#E8DED0]"
                     >
-                      <td className="py-3 px-4 text-[#705B51] whitespace-nowrap">
-                        {formatDateTime(log.created_at)}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-[#43291F]">
-                        {log.ingredients?.name}
-                      </td>
-                      <td className="py-3 px-4 font-mono font-bold text-[#43291F]">
-                        {log.reported_usage} {log.ingredients?.unit}
-                      </td>
-                      <td className="py-3 px-4 text-[#705B51]">
-                        {log.expected_usage} {log.ingredients?.unit}
-                      </td>
-                      <td className="py-3 px-4 font-bold">
-                        <span
-                          className={
-                            isHigh ? "text-red-700" : isLow ? "text-amber-700" : "text-emerald-700"
-                          }
-                        >
-                          {log.variance_percent > 0 ? `+${log.variance_percent}%` : `${log.variance_percent}%`}
-                        </span>
-                      </td>
-                      <td className="py-3 px-4">
-                        {isHigh && (
-                          <Badge variant="destructive" className="text-[10px] gap-1 inline-flex items-center">
-                            <AlertTriangle className="w-3 h-3" /> High Variance Alert
-                          </Badge>
-                        )}
-                        {isLow && (
-                          <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-800">
-                            Below Average
-                          </Badge>
-                        )}
-                        {!isHigh && !isLow && (
-                          <Badge variant="olive" className="text-[10px] gap-1 inline-flex items-center">
-                            <CheckCircle2 className="w-3 h-3" /> Normal Range
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 text-[#705B51]">
-                        {log.notes || "—"}
-                      </td>
-                      <td className="py-3 px-4 text-right font-medium text-[#43291F]">
-                        {log.profiles?.full_name || "Manager"}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {usageLogs.length === 0 && (
-            <div className="py-14 text-center text-[#A09289]">
-              <Scale className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="font-serif font-bold text-base text-[#43291F]">No Material Usage Logs</p>
-              <p className="text-xs text-[#705B51] mt-1">
-                When store managers log daily raw material consumption, average analysis will appear here.
-              </p>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* ── TAB 6: PHYSICAL STOCK AUDITS & MISSING ITEMS ── */}
-      {activeTab === "audits" && (
-        <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-[#E8DED0] flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-            <div>
-              <p className="text-sm font-bold font-serif text-[#43291F]">
-                Physical Inventory Audits & Shrinkage Verification
-              </p>
-              <p className="text-xs text-[#705B51] mt-0.5">
-                Physical store stock audits submitted by managers. Cross-checked with system inventory to catch shrinkage or missing items.
-              </p>
-            </div>
-            <div className="flex items-center gap-2">
-              <span className="text-[11px] font-semibold text-[#705B51]">
-                Total Audits: {audits.length}
-              </span>
-            </div>
-          </div>
-
-          <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs">
-              <thead className="bg-[#F8F3E9] border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
-                <tr>
-                  <th className="py-3 px-4">Audit Date</th>
-                  <th className="py-3 px-4">Audited By</th>
-                  <th className="py-3 px-4">Items Audited</th>
-                  <th className="py-3 px-4">Missing Items Detected</th>
-                  <th className="py-3 px-4">Estimated Loss Value</th>
-                  <th className="py-3 px-4">Audit Status</th>
-                  <th className="py-3 px-4 text-right">Manager Remarks</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-[#E8DED0]">
-                {audits.map((a) => {
-                  const hasMissing = Number(a.missing_items_count) > 0
-                  return (
-                    <tr
-                      key={a.id}
-                      className={`hover:bg-[#F8F3E9]/50 transition-colors ${
-                        hasMissing ? "bg-red-50/40" : ""
-                      }`}
-                    >
-                      <td className="py-3 px-4 text-[#705B51] whitespace-nowrap">
-                        {formatDateTime(a.created_at)}
-                      </td>
-                      <td className="py-3 px-4 font-bold text-[#43291F]">
-                        {a.profiles?.full_name || "Manager"}
-                      </td>
-                      <td className="py-3 px-4 font-semibold text-[#705B51]">
-                        {a.total_items_audited} items
-                      </td>
-                      <td className="py-3 px-4">
-                        {hasMissing ? (
-                          <Badge variant="destructive" className="text-[10px] gap-1 inline-flex items-center font-bold">
-                            <AlertTriangle className="w-3 h-3" />
-                            {a.missing_items_count} Missing Items
-                          </Badge>
-                        ) : (
-                          <Badge variant="olive" className="text-[10px] gap-1 inline-flex items-center">
-                            <CheckCircle2 className="w-3 h-3" /> All Stock Intact
-                          </Badge>
-                        )}
-                      </td>
-                      <td className="py-3 px-4 font-bold font-serif text-red-600">
-                        {Number(a.total_loss_value) > 0 ? formatCurrency(a.total_loss_value) : "₹0.00"}
-                      </td>
-                      <td className="py-3 px-4">
-                        <Badge
-                          variant={a.status === "reconciled" ? "olive" : "secondary"}
-                          className="capitalize text-[10px]"
-                        >
-                          {a.status.replace("_", " ")}
-                        </Badge>
-                      </td>
-                      <td className="py-3 px-4 text-right text-[#705B51] text-[11px]">
-                        {a.notes || "—"}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-
-          {audits.length === 0 && (
-            <div className="py-14 text-center text-[#A09289]">
-              <ClipboardCheck className="w-8 h-8 mx-auto mb-2 opacity-40" />
-              <p className="font-serif font-bold text-base text-[#43291F]">No Physical Audits Recorded</p>
-              <p className="text-xs text-[#705B51] mt-1">
-                When store managers perform physical inventory counts via POS, audit records and missing item comparisons will appear here.
-              </p>
-            </div>
-          )}
-        </Card>
-      )}
-
-      {/* ── ADD INGREDIENT MODAL ── */}
-      <Dialog open={showAddIngModal} onOpenChange={setShowAddIngModal}>
-        <DialogContent className="max-w-lg">
-          <DialogHeader>
-            <DialogTitle>Add Raw Material / Ingredient</DialogTitle>
-          </DialogHeader>
-
-          <form
-            action={async (formData) => {
-              setLoading(true)
-              const res = await addIngredientAction(formData)
-              setLoading(false)
-              if (res.success && res.ingredient) {
-                setIngredients((prev) => [...prev, res.ingredient])
-                setShowAddIngModal(false)
-                setStatusMsg({
-                  type: "success",
-                  text: `Ingredient "${res.ingredient.name}" registered.`,
-                })
-              } else {
-                setStatusMsg({ type: "error", text: res.error || "Failed to add ingredient" })
-              }
-            }}
-            className="space-y-4 pt-2"
-          >
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="ingName">Material / Ingredient Name *</Label>
-                <Input id="ingName" name="name" placeholder="e.g. Buffalo Milk" required />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="unit">Unit of Measure *</Label>
-                <Select id="unit" name="unit" required>
-                  <option value="g">Grams (g)</option>
-                  <option value="kg">Kilograms (kg)</option>
-                  <option value="ml">Millilitres (ml)</option>
-                  <option value="l">Litres (l)</option>
-                  <option value="pcs">Pieces (pcs)</option>
-                </Select>
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="minStock">Min Stock Alert Level *</Label>
-                <Input
-                  id="minStock"
-                  name="min_stock"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="5.00"
-                  required
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="initStock">Opening Stock Qty</Label>
-                <Input
-                  id="initStock"
-                  name="current_stock"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="0.00"
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="unitCost">Cost Per Unit (₹)</Label>
-                <Input
-                  id="unitCost"
-                  name="cost_per_unit"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  placeholder="60.00"
-                />
-              </div>
-
-              <div className="space-y-1.5 col-span-2">
-                <Label htmlFor="prefSupplier">Preferred Supplier</Label>
-                <Select id="prefSupplier" name="preferred_supplier_id">
-                  <option value="">None / Open Market</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
+                      {amt > 0 ? `+${amt}` : amt}
+                    </button>
                   ))}
-                </Select>
+                </div>
               </div>
-            </div>
 
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold"
-            >
-              {loading ? "Adding Material..." : "Save Material & Opening Stock"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+              <div className="p-3 rounded-lg bg-[#FFFDF8] border border-[#E8DED0] text-xs space-y-1">
+                <div className="flex justify-between">
+                  <span className="text-[#705B51]">New Stock After Inward:</span>
+                  <span className="font-bold text-[#737B52] font-mono text-sm">
+                    {Math.max(0, (selectedProduct.current_stock || 0) + adjustmentAmount)} units
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[#705B51]">Inward Cost Value:</span>
+                  <span className="font-bold text-[#43291F] font-mono">
+                    {formatCurrency(Math.max(0, adjustmentAmount) * (selectedProduct.cost_price || 0))}
+                  </span>
+                </div>
+              </div>
 
-      {/* ── ADD SUPPLIER MODAL ── */}
-      <Dialog open={showAddSupplierModal} onOpenChange={setShowAddSupplierModal}>
-        <DialogContent className="max-w-md">
-          <DialogHeader>
-            <DialogTitle>Add New Supplier</DialogTitle>
-          </DialogHeader>
-
-          <form
-            action={async (formData) => {
-              setLoading(true)
-              const res = await addSupplierAction(formData)
-              setLoading(false)
-              if (res.success && res.supplier) {
-                setSuppliers((prev) => [...prev, res.supplier])
-                setShowAddSupplierModal(false)
-                setStatusMsg({
-                  type: "success",
-                  text: `Supplier "${res.supplier.name}" added successfully.`,
-                })
-              } else {
-                setStatusMsg({ type: "error", text: res.error || "Failed to add supplier" })
-              }
-            }}
-            className="space-y-4 pt-2"
-          >
-            <div className="space-y-1.5">
-              <Label htmlFor="supName">Supplier / Vendor Name *</Label>
-              <Input id="supName" name="name" placeholder="e.g. Ganga Dairy Farm" required />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="supPhone">Phone Number</Label>
-              <Input id="supPhone" name="phone" placeholder="e.g. +91 9876543210" />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="supEmail">Email</Label>
-              <Input id="supEmail" name="email" type="email" placeholder="vendor@gmail.com" />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label htmlFor="supAddr">Shop Address</Label>
-              <Input id="supAddr" name="address" placeholder="e.g. Market Road, Stall 4" />
-            </div>
-
-            <Button
-              type="submit"
-              disabled={loading}
-              className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold"
-            >
-              {loading ? "Saving Supplier..." : "Save Supplier Record"}
-            </Button>
-          </form>
-        </DialogContent>
-      </Dialog>
+              <Button
+                type="submit"
+                disabled={loading || adjustmentAmount === 0}
+                className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold"
+              >
+                {loading ? "Updating Stock..." : "Confirm Stock Inward"}
+              </Button>
+            </form>
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   )
 }

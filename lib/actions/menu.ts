@@ -78,6 +78,9 @@ export async function addProductAction(formData: FormData) {
   const name = formData.get('name') as string
   const categoryId = formData.get('category_id') as string
   const basePrice = Number(formData.get('base_price'))
+  const costPrice = Number(formData.get('cost_price') || 0)
+  const currentStock = parseInt((formData.get('current_stock') as string) || '50', 10)
+  const minStock = parseInt((formData.get('min_stock') as string) || '10', 10)
   const description = (formData.get('description') as string) || null
   const trackInventory = formData.get('track_inventory') === 'true'
   const isAvailable = formData.get('is_available') !== 'false'
@@ -93,6 +96,10 @@ export async function addProductAction(formData: FormData) {
       category_id: categoryId,
       name,
       base_price: basePrice,
+      cost_price: costPrice,
+      current_stock: currentStock,
+      min_stock: minStock,
+      track_stock: true,
       description,
       track_inventory: trackInventory,
       is_available: isAvailable,
@@ -110,7 +117,7 @@ export async function addProductAction(formData: FormData) {
     action_type: 'PRODUCT_CREATED',
     table_name: 'products',
     record_id: newProd.id,
-    new_value: { name, base_price: basePrice },
+    new_value: { name, base_price: basePrice, cost_price: costPrice },
   })
 
   revalidatePath('/admin/menu')
@@ -132,6 +139,9 @@ export async function updateProductAction(productId: string, formData: FormData)
   const name = formData.get('name') as string
   const categoryId = formData.get('category_id') as string
   const basePrice = Number(formData.get('base_price'))
+  const costPrice = Number(formData.get('cost_price') || 0)
+  const currentStock = parseInt((formData.get('current_stock') as string) || String(currentProd.current_stock ?? 50), 10)
+  const minStock = parseInt((formData.get('min_stock') as string) || String(currentProd.min_stock ?? 10), 10)
   const description = (formData.get('description') as string) || null
   const trackInventory = formData.get('track_inventory') === 'true'
   const isAvailable = formData.get('is_available') !== 'false'
@@ -153,6 +163,9 @@ export async function updateProductAction(productId: string, formData: FormData)
       name,
       category_id: categoryId,
       base_price: basePrice,
+      cost_price: costPrice,
+      current_stock: currentStock,
+      min_stock: minStock,
       description,
       track_inventory: trackInventory,
       is_available: isAvailable,

@@ -1,6 +1,6 @@
 import * as React from "react"
 import Link from "next/link"
-import { Coffee, Receipt, PackagePlus, Trash2, CalendarCheck, LogOut, Wifi, Scale, ClipboardCheck } from "lucide-react"
+import { Coffee, Receipt, FileText, Trash2, CalendarCheck, LogOut, Wifi } from "lucide-react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { Button } from "@/components/ui/button"
 import { logoutAction } from "@/lib/actions/auth"
@@ -37,46 +37,29 @@ export default async function POSLayout({
             </Link>
           </div>
 
-          {/* Operational Navigation */}
-          <nav className="hidden md:flex items-center gap-1">
+          {/* Operational Navigation (Streamlined Billzgo Cashier Flow) */}
+          <nav className="hidden md:flex items-center gap-1.5">
             <Link href="/pos">
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
                 <Receipt className="w-4 h-4 mr-1 text-[#B56C4A]" />
-                New Billing
+                Billing
               </Button>
             </Link>
             <Link href="/pos/bills">
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
+                <FileText className="w-4 h-4 mr-1 text-[#705B51]" />
                 Previous Bills
-              </Button>
-            </Link>
-            <Link href="/pos/stock">
-              <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
-                <PackagePlus className="w-4 h-4 mr-1 text-[#737B52]" />
-                Stock Inward
-              </Button>
-            </Link>
-            <Link href="/pos/usage">
-              <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
-                <Scale className="w-4 h-4 mr-1 text-[#B56C4A]" />
-                Daily Usage
-              </Button>
-            </Link>
-            <Link href="/pos/audit">
-              <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
-                <ClipboardCheck className="w-4 h-4 mr-1 text-[#737B52]" />
-                Stock Audit
               </Button>
             </Link>
             <Link href="/pos/wastage">
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
                 <Trash2 className="w-4 h-4 mr-1 text-red-600" />
-                Wastage
+                Day-End Wastage
               </Button>
             </Link>
             <Link href="/pos/closing">
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
-                <CalendarCheck className="w-4 h-4 mr-1 text-[#43291F]" />
+                <CalendarCheck className="w-4 h-4 mr-1 text-[#737B52]" />
                 Daily Closing
               </Button>
             </Link>
@@ -116,39 +99,24 @@ export default async function POSLayout({
         </div>
 
         {/* Mobile Sub-Navigation Bar */}
-        <div className="flex md:hidden overflow-x-auto gap-1 pt-2 pb-1 scrollbar-none border-t border-[#E8DED0]/50 mt-2">
+        <div className="flex md:hidden overflow-x-auto gap-1.5 pt-2 pb-1 scrollbar-none border-t border-[#E8DED0]/50 mt-2">
           <Link href="/pos">
-            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#EFE7DA] text-[#43291F] text-xs font-semibold inline-block">
+            <span className="whitespace-nowrap px-3 py-1 rounded bg-[#EFE7DA] text-[#43291F] text-xs font-semibold inline-block">
               Billing
             </span>
           </Link>
           <Link href="/pos/bills">
-            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+            <span className="whitespace-nowrap px-3 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
               Bills
             </span>
           </Link>
-          <Link href="/pos/stock">
-            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
-              Stock In
-            </span>
-          </Link>
-          <Link href="/pos/usage">
-            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
-              Daily Usage
-            </span>
-          </Link>
-          <Link href="/pos/audit">
-            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
-              Audit
-            </span>
-          </Link>
           <Link href="/pos/wastage">
-            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
-              Wastage
+            <span className="whitespace-nowrap px-3 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+              Day-End Wastage
             </span>
           </Link>
           <Link href="/pos/closing">
-            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+            <span className="whitespace-nowrap px-3 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
               Closing
             </span>
           </Link>

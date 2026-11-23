@@ -5,12 +5,13 @@ import Link from "next/link"
 import {
   TrendingUp,
   Receipt,
-  ShoppingBag,
-  DollarSign,
   AlertTriangle,
   Wallet,
   ArrowUpRight,
-  Coffee,
+  Trash2,
+  Boxes,
+  UtensilsCrossed,
+  CheckCircle2,
 } from "lucide-react"
 import {
   ResponsiveContainer,
@@ -20,8 +21,6 @@ import {
   YAxis,
   Tooltip,
   CartesianGrid,
-  BarChart,
-  Bar,
 } from "recharts"
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
@@ -36,9 +35,15 @@ interface DashboardOverviewProps {
       month_sales: number
       month_bills: number
       avg_order_value: number
-      items_today: number
       low_stock_count: number
     }
+    today_cogs?: number
+    today_gross_profit?: number
+    today_wastage_loss?: number
+    today_net_profit?: number
+    month_cogs?: number
+    month_wastage_loss?: number
+    month_net_profit?: number
     total_expenses: number
     net_profit: number
     recent_trend: any[]
@@ -47,7 +52,9 @@ interface DashboardOverviewProps {
   lowStockCount?: number
 }
 
-export function DashboardOverview({ data, lowStockCount }: DashboardOverviewProps) {
+export function DashboardOverview({ data, lowStockCount = 0 }: DashboardOverviewProps) {
+  const [period, setPeriod] = React.useState<"today" | "month">("today")
+
   if (!data) {
     return (
       <div className="py-12 text-center">
@@ -56,136 +63,189 @@ export function DashboardOverview({ data, lowStockCount }: DashboardOverviewProp
     )
   }
 
-  const { kpis, total_expenses, net_profit, recent_trend, low_stock_items } = data
-  const hasSales = kpis.month_sales > 0 || kpis.month_bills > 0
+  const {
+    kpis,
+    today_cogs = 0,
+    today_wastage_loss = 0,
+    today_net_profit = 0,
+    month_cogs = 0,
+    month_wastage_loss = 0,
+    month_net_profit = 0,
+    total_expenses = 0,
+    recent_trend = [],
+    low_stock_items = [],
+  } = data
+
+  const isToday = period === "today"
+  const currentSales = isToday ? kpis.today_sales : kpis.month_sales
+  const currentBills = isToday ? kpis.today_bills : kpis.month_bills
+  const currentCogs = isToday ? today_cogs : month_cogs
+  const currentWastage = isToday ? today_wastage_loss : month_wastage_loss
+  const currentNetProfit = isToday ? today_net_profit : month_net_profit
+  const currentMargin = currentSales > 0 ? ((currentNetProfit / currentSales) * 100).toFixed(1) : "0.0"
 
   return (
     <div className="space-y-6">
-      {/* Welcome & Time Header */}
+      {/* Welcome & Time Switcher Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
         <div>
           <h1 className="font-serif text-3xl font-bold text-[#43291F]">
-            Business Overview
+            Commercial Overview
           </h1>
           <p className="text-xs text-[#705B51] mt-0.5">
-            Real-time commercial metrics for Heaven&apos;s Cafe
+            Real-time sales, manufacturing costs, wastage loss, and net profit for Heaven&apos;s Cafe
           </p>
         </div>
 
+        {/* Period Switcher (Billzgo style) */}
         <div className="flex items-center gap-2">
-          <Link href="/admin/inventory">
+          <div className="flex bg-[#EFE7DA] p-1 rounded-lg border border-[#E8DED0]">
+            <button
+              onClick={() => setPeriod("today")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                isToday ? "bg-[#43291F] text-white shadow-xs" : "text-[#705B51] hover:text-[#43291F]"
+              }`}
+            >
+              Today
+            </button>
+            <button
+              onClick={() => setPeriod("month")}
+              className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer ${
+                !isToday ? "bg-[#43291F] text-white shadow-xs" : "text-[#705B51] hover:text-[#43291F]"
+              }`}
+            >
+              This Month
+            </button>
+          </div>
+
+          <Link href="/admin/menu">
             <Button size="sm" variant="outline" className="border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F] text-xs font-semibold">
-              <AlertTriangle className="w-3.5 h-3.5 mr-1 text-[#B56C4A]" />
-              View Stock Alerts
+              <UtensilsCrossed className="w-3.5 h-3.5 mr-1 text-[#B56C4A]" />
+              Manage Costs &amp; Prices
             </Button>
           </Link>
         </div>
       </div>
 
-      {/* ── LOW STOCK ALERT BANNER ── */}
-      {(lowStockCount ?? 0) > 0 && (
+      {/* ── LOW STOCK WATCHLIST BANNER ── */}
+      {low_stock_items.length > 0 && (
         <Link href="/admin/inventory">
-          <Card className="border-2 border-red-500 bg-red-50/60 shadow-sm cursor-pointer hover:bg-red-50 transition-colors">
-            <CardContent className="p-4 flex items-center gap-4">
-              <div className="w-10 h-10 rounded-xl bg-red-100 flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-5 h-5 text-red-700" />
+          <Card className="border-2 border-amber-300 bg-amber-50/70 shadow-sm cursor-pointer hover:bg-amber-50 transition-colors">
+            <CardContent className="p-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-lg bg-amber-100 flex items-center justify-center shrink-0">
+                  <AlertTriangle className="w-5 h-5 text-amber-800" />
+                </div>
+                <div>
+                  <p className="text-xs font-bold text-amber-950">
+                    Product Stock Alert — {low_stock_items.length} item{low_stock_items.length > 1 ? "s" : ""} low in stock
+                  </p>
+                  <p className="text-[11px] text-amber-800 mt-0.5">
+                    {low_stock_items.slice(0, 3).map((p) => `${p.name} (${p.current_stock} left)`).join(", ")}
+                    {low_stock_items.length > 3 ? "..." : ""}
+                  </p>
+                </div>
               </div>
-              <div className="flex-1 min-w-0">
-                <p className="text-sm font-bold text-red-800">
-                  Low Stock Alert — {lowStockCount} ingredient{(lowStockCount ?? 0) > 1 ? "s" : ""} need restocking
-                </p>
-                <p className="text-xs text-red-700 mt-0.5">
-                  Tap to view the Inventory &amp; Stock page and reorder supplies
-                </p>
-              </div>
-              <ArrowUpRight className="w-5 h-5 text-red-600 shrink-0" />
+              <ArrowUpRight className="w-4 h-4 text-amber-800 shrink-0" />
             </CardContent>
           </Card>
         </Link>
       )}
 
-      {/* ── KPI METRICS CARDS ── */}
-      <div className="grid grid-cols-2 sm:grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        {/* Today's Sales */}
+      {/* ── 4 CORE FINANCIAL PILLARS (Billzgo Model) ── */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+        {/* 1. Gross Revenue */}
         <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#737B52]">Today&apos;s Sales</span>
-            <div className="w-8 h-8 rounded-lg bg-[#F0F1EA] text-[#737B52] flex items-center justify-center">
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[#737B52]">
+              {isToday ? "Today's Revenue" : "Month Revenue"}
+            </span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#F0F1EA] text-[#737B52] flex items-center justify-center">
               <TrendingUp className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="font-serif text-2xl font-bold text-[#43291F] block">
-              {formatCurrency(kpis.today_sales)}
+            <span className="font-serif text-xl sm:text-2xl font-bold text-[#43291F] block">
+              {formatCurrency(currentSales)}
             </span>
             <span className="text-[11px] text-[#705B51] block mt-0.5">
-              {kpis.today_bills} completed bills today
+              {currentBills} completed bill{currentBills !== 1 ? "s" : ""}
             </span>
           </div>
         </Card>
 
-        {/* Month Sales */}
+        {/* 2. Manufacturing Cost (COGS) */}
         <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#B56C4A]">Month Revenue</span>
-            <div className="w-8 h-8 rounded-lg bg-[#FAF0EB] text-[#B56C4A] flex items-center justify-center">
-              <DollarSign className="w-4 h-4" />
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[#B56C4A]">
+              Manufacturing Cost
+            </span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-[#FAF0EB] text-[#B56C4A] flex items-center justify-center">
+              <Boxes className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="font-serif text-2xl font-bold text-[#43291F] block">
-              {formatCurrency(kpis.month_sales)}
+            <span className="font-serif text-xl sm:text-2xl font-bold text-[#705B51] block">
+              {formatCurrency(currentCogs)}
             </span>
-            <span className="text-[11px] text-[#705B51] block mt-0.5">
-              {kpis.month_bills} bills this month
+            <span className="text-[11px] text-[#A09289] block mt-0.5">
+              Cost of ingredients used
             </span>
           </div>
         </Card>
 
-        {/* Operating Expenses */}
+        {/* 3. Product Wastage Loss */}
         <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#705B51]">Month Expenses</span>
-            <div className="w-8 h-8 rounded-lg bg-[#EFE7DA] text-[#43291F] flex items-center justify-center">
-              <Wallet className="w-4 h-4" />
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-red-700">
+              Wastage &amp; Loss
+            </span>
+            <div className="w-7 h-7 sm:w-8 sm:h-8 rounded-lg bg-red-100 text-red-700 flex items-center justify-center">
+              <Trash2 className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <span className="font-serif text-2xl font-bold text-[#43291F] block">
-              {formatCurrency(total_expenses)}
+            <span className="font-serif text-xl sm:text-2xl font-bold text-red-700 block">
+              {formatCurrency(currentWastage)}
             </span>
-            <span className="text-[11px] text-[#705B51] block mt-0.5">
-              Rent, bills & operations
+            <span className="text-[11px] text-red-600 block mt-0.5">
+              Spoiled &amp; expired items
             </span>
           </div>
         </Card>
 
-        {/* Estimated Net Profit */}
+        {/* 4. Net Operating Profit */}
         <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-bold uppercase tracking-wider text-[#43291F]">Est. Net Profit</span>
-            <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${
-              net_profit >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
-            }`}>
+            <span className="text-[10px] sm:text-xs font-bold uppercase tracking-wider text-[#43291F]">
+              Net Gross Profit
+            </span>
+            <div
+              className={`w-7 h-7 sm:w-8 sm:h-8 rounded-lg flex items-center justify-center ${
+                currentNetProfit >= 0 ? "bg-emerald-100 text-emerald-800" : "bg-red-100 text-red-800"
+              }`}
+            >
               <ArrowUpRight className="w-4 h-4" />
             </div>
           </div>
           <div className="mt-3">
-            <span className={`font-serif text-2xl font-bold block ${
-              net_profit >= 0 ? "text-emerald-800" : "text-red-700"
-            }`}>
-              {formatCurrency(net_profit)}
+            <span
+              className={`font-serif text-xl sm:text-2xl font-bold block ${
+                currentNetProfit >= 0 ? "text-emerald-800" : "text-red-700"
+              }`}
+            >
+              {formatCurrency(currentNetProfit)}
             </span>
             <span className="text-[11px] text-[#705B51] block mt-0.5">
-              Revenue minus expenses
+              Margin: <strong>{currentMargin}%</strong>
             </span>
           </div>
         </Card>
       </div>
 
-      {/* ── SECONDARY METRICS (AOV, Items sold, Low Stock) ── */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
-        <div className="p-3.5 rounded-xl bg-[#FFFDF8] border border-[#E8DED0] flex items-center justify-between">
+      {/* ── SECONDARY METRICS (AOV & Expenses) ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
+        <div className="p-3.5 rounded-xl bg-[#FFFDF8] border border-[#E8DED0] flex items-center justify-between shadow-xs">
           <div>
             <span className="text-[11px] text-[#705B51] block">Average Order Value (AOV)</span>
             <span className="font-serif text-lg font-bold text-[#43291F]">
@@ -195,64 +255,43 @@ export function DashboardOverview({ data, lowStockCount }: DashboardOverviewProp
           <Receipt className="w-5 h-5 text-[#B56C4A]" />
         </div>
 
-        <div className="p-3.5 rounded-xl bg-[#FFFDF8] border border-[#E8DED0] flex items-center justify-between">
+        <div className="p-3.5 rounded-xl bg-[#FFFDF8] border border-[#E8DED0] flex items-center justify-between shadow-xs">
           <div>
-            <span className="text-[11px] text-[#705B51] block">Items Sold Today</span>
+            <span className="text-[11px] text-[#705B51] block">Monthly Operating Expenses</span>
             <span className="font-serif text-lg font-bold text-[#43291F]">
-              {kpis.items_today} units
+              {formatCurrency(total_expenses)}
             </span>
           </div>
-          <ShoppingBag className="w-5 h-5 text-[#737B52]" />
-        </div>
-
-        <div className="p-3.5 rounded-xl bg-[#FFFDF8] border border-[#E8DED0] flex items-center justify-between">
-          <div>
-            <span className="text-[11px] text-[#705B51] block">Low Stock Alert Count</span>
-            <span className={`font-serif text-lg font-bold ${
-              kpis.low_stock_count > 0 ? "text-amber-800" : "text-emerald-800"
-            }`}>
-              {kpis.low_stock_count} items
-            </span>
-          </div>
-          <AlertTriangle className={`w-5 h-5 ${
-            kpis.low_stock_count > 0 ? "text-amber-600" : "text-emerald-600"
-          }`} />
+          <Wallet className="w-5 h-5 text-[#737B52]" />
         </div>
       </div>
 
-      {/* ── REVENUE TREND CHART ── */}
+      {/* ── RECENT SALES PROGRESS CHART ── */}
       <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm">
-        <CardHeader className="pb-2">
-          <CardTitle className="text-base text-[#43291F]">
-            Recent Revenue Trend
-          </CardTitle>
-          <CardDescription>
-            Daily sales revenue from verified database invoices
-          </CardDescription>
-        </CardHeader>
-
-        <CardContent className="p-4">
-          {!hasSales && recent_trend.length === 0 ? (
-            <div className="py-14 text-center text-[#A09289]">
-              <Receipt className="w-10 h-10 mx-auto mb-2 opacity-40 text-[#43291F]" />
-              <p className="font-serif font-bold text-base text-[#43291F]">
-                No Transactions Recorded Yet
-              </p>
-              <p className="text-xs text-[#705B51] max-w-sm mx-auto mt-1">
-                Real sales analytics will render automatically as orders are rung up through the Shop POS terminal.
-              </p>
+        <CardHeader className="pb-2 border-b border-[#E8DED0]">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base text-[#43291F]">Sales Revenue Progression</CardTitle>
+              <CardDescription className="text-xs">
+                7-day daily turnover trend for Heaven&apos;s Cafe
+              </CardDescription>
             </div>
-          ) : (
+            <Link href="/admin/reports">
+              <Button variant="ghost" size="sm" className="text-xs text-[#B56C4A] hover:bg-[#FAF0EB]">
+                Full P&amp;L Reports &rarr;
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent className="p-4 pt-6">
+          {recent_trend.length > 0 ? (
             <div className="h-64 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart
-                  data={recent_trend}
-                  margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-                >
+                <AreaChart data={recent_trend} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
                   <defs>
-                    <linearGradient id="colorRev" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#43291F" stopOpacity={0.4} />
-                      <stop offset="95%" stopColor="#43291F" stopOpacity={0.0} />
+                    <linearGradient id="cafeRevenue" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor="#B56C4A" stopOpacity={0.4} />
+                      <stop offset="95%" stopColor="#B56C4A" stopOpacity={0} />
                     </linearGradient>
                   </defs>
                   <CartesianGrid strokeDasharray="3 3" stroke="#E8DED0" />
@@ -260,83 +299,112 @@ export function DashboardOverview({ data, lowStockCount }: DashboardOverviewProp
                     dataKey="sale_date"
                     stroke="#705B51"
                     fontSize={11}
-                    tickFormatter={(val) => {
-                      const d = new Date(val)
-                      return `${d.getDate()} ${d.toLocaleDateString("en-US", { month: "short" })}`
+                    tickFormatter={(v) => {
+                      const d = new Date(v)
+                      return `${d.getDate()}/${d.getMonth() + 1}`
                     }}
                   />
                   <YAxis stroke="#705B51" fontSize={11} />
                   <Tooltip
+                    formatter={(value: any) => [formatCurrency(Number(value)), "Revenue"]}
                     contentStyle={{
                       backgroundColor: "#FFFDF8",
                       borderColor: "#E8DED0",
                       borderRadius: "8px",
                       fontSize: "12px",
                     }}
-                    formatter={(val: any) => [`₹${Number(val).toFixed(2)}`, "Revenue"]}
                   />
                   <Area
                     type="monotone"
-                    dataKey="total_revenue"
-                    stroke="#43291F"
-                    strokeWidth={2}
+                    dataKey="total_sales"
+                    stroke="#B56C4A"
+                    strokeWidth={2.5}
                     fillOpacity={1}
-                    fill="url(#colorRev)"
+                    fill="url(#cafeRevenue)"
                   />
                 </AreaChart>
               </ResponsiveContainer>
+            </div>
+          ) : (
+            <div className="py-12 text-center text-[#705B51]">
+              <TrendingUp className="w-8 h-8 mx-auto mb-2 opacity-30 text-[#43291F]" />
+              <p className="font-serif font-bold text-sm">No Sales Recorded in the Last 7 Days</p>
+              <p className="text-xs text-[#A09289] mt-1">
+                Completed bills from the POS will automatically populate this revenue timeline.
+              </p>
             </div>
           )}
         </CardContent>
       </Card>
 
-      {/* ── LOW STOCK WARNINGS ── */}
-      {low_stock_items.length > 0 && (
-        <Card className="border-amber-200 bg-amber-50/40 shadow-sm">
-          <CardHeader className="pb-2">
-            <CardTitle className="text-base text-amber-900 flex items-center gap-2">
-              <AlertTriangle className="w-4 h-4 text-amber-700" />
-              Low Stock Warnings
-            </CardTitle>
-            <CardDescription className="text-amber-800">
-              Ingredients currently at or below their configured minimum reorder threshold
-            </CardDescription>
-          </CardHeader>
+      {/* ── INVENTORY STOCKS SNAPSHOT (Item-Level) ── */}
+      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm">
+        <CardHeader className="pb-2 border-b border-[#E8DED0]">
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="text-base text-[#43291F]">Product Inventory &amp; Stock Levels</CardTitle>
+              <CardDescription className="text-xs">
+                Real-time stock counts for cafe products (updated on each sale and day-end wastage)
+              </CardDescription>
+            </div>
+            <Link href="/admin/inventory">
+              <Button variant="ghost" size="sm" className="text-xs text-[#737B52] hover:bg-[#F0F1EA]">
+                View All Stocks &rarr;
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-[#F8F3E9] text-[#705B51] uppercase text-[10px] tracking-wider border-b border-[#E8DED0]">
+                <tr>
+                  <th className="py-3 px-4">Menu Item</th>
+                  <th className="py-3 px-3">Selling Price</th>
+                  <th className="py-3 px-3">Manufacturing Cost</th>
+                  <th className="py-3 px-3">Unit Profit</th>
+                  <th className="py-3 px-3">Current Stock</th>
+                  <th className="py-3 px-4 text-right">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[#E8DED0]">
+                {low_stock_items.map((p) => {
+                  const sp = Number(p.base_price || 0)
+                  const cp = Number(p.cost_price || 0)
+                  const profit = sp - cp
+                  const isLow = Number(p.current_stock) <= Number(p.min_stock)
+                  const isOut = Number(p.current_stock) <= 0
 
-          <CardContent className="p-4 pt-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-xs text-left">
-                <thead className="border-b border-amber-200 text-amber-900 font-bold">
-                  <tr>
-                    <th className="py-2 px-3">Ingredient</th>
-                    <th className="py-2 px-3">Current Stock</th>
-                    <th className="py-2 px-3">Minimum Stock</th>
-                    <th className="py-2 px-3 text-right">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-amber-200/60">
-                  {low_stock_items.map((item) => (
-                    <tr key={item.id}>
-                      <td className="py-2.5 px-3 font-bold text-[#43291F]">{item.name}</td>
-                      <td className="py-2.5 px-3 text-red-700 font-bold">
-                        {item.current_stock} {item.unit}
-                      </td>
-                      <td className="py-2.5 px-3 text-[#705B51]">
-                        {item.min_stock} {item.unit}
-                      </td>
-                      <td className="py-2.5 px-3 text-right">
-                        <Badge variant="destructive" className="text-[10px]">
-                          {item.current_stock <= 0 ? "Out of Stock" : "Low Stock"}
-                        </Badge>
+                  return (
+                    <tr key={p.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
+                      <td className="py-3 px-4 font-bold text-[#43291F]">{p.name}</td>
+                      <td className="py-3 px-3 font-semibold text-[#43291F]">{formatCurrency(sp)}</td>
+                      <td className="py-3 px-3 text-[#705B51]">{formatCurrency(cp)}</td>
+                      <td className="py-3 px-3 font-semibold text-emerald-700">+{formatCurrency(profit)}</td>
+                      <td className="py-3 px-3 font-bold font-mono text-[#43291F]">{p.current_stock} units</td>
+                      <td className="py-3 px-4 text-right">
+                        {isOut ? (
+                          <Badge variant="destructive" className="text-[10px]">
+                            Out of Stock
+                          </Badge>
+                        ) : isLow ? (
+                          <Badge variant="outline" className="text-[10px] border-amber-400 text-amber-800 bg-amber-50">
+                            Low Stock
+                          </Badge>
+                        ) : (
+                          <Badge variant="olive" className="text-[10px]">
+                            Adequate
+                          </Badge>
+                        )}
                       </td>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
-      )}
+                  )
+                })}
+              </tbody>
+            </table>
+          </div>
+        </CardContent>
+      </Card>
     </div>
   )
 }

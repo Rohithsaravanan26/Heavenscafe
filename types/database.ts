@@ -68,9 +68,13 @@ export interface Product {
   name: string
   description: string | null
   base_price: number
+  cost_price: number
+  current_stock: number
+  min_stock: number
+  track_stock: boolean
   is_active: boolean
   is_available: boolean
-  track_inventory: boolean
+  track_inventory?: boolean
   display_order: number
   is_featured: boolean
   created_at: string
@@ -79,6 +83,36 @@ export interface Product {
   menu_categories?: MenuCategory
   product_variants?: ProductVariant[]
   product_addons?: ProductAddon[]
+}
+
+export interface ProductWastage {
+  id: string
+  shop_id: string
+  manager_id: string
+  product_id: string
+  quantity: number
+  cost_price: number
+  total_loss: number
+  wastage_date: string
+  reason: string
+  notes: string | null
+  created_at: string
+  products?: Product
+  profiles?: Profile
+}
+
+export interface CommercialSummary {
+  gross_sales: number
+  total_bills: number
+  avg_bill: number
+  total_cogs: number
+  gross_profit: number
+  wastage_loss: number
+  wastage_items: number
+  expenses: number
+  net_profit: number
+  profit_margin: number
+  low_stock_count: number
 }
 
 export interface ProductVariant {
@@ -148,8 +182,10 @@ export interface SaleItem {
   product_name: string
   variant_name: string | null
   unit_price: number
+  cost_price?: number
   quantity: number
   subtotal: number
+  profit?: number
   created_at: string
 }
 
