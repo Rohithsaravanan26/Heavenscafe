@@ -20,6 +20,7 @@ interface DailyClosingFormProps {
     card_sales: number
     other_sales: number
     total_sales: number
+    cash_expenses?: number
     expected_cash: number
     existing_closing: any | null
   }
@@ -161,7 +162,7 @@ export function DailyClosingForm({ summary }: DailyClosingFormProps) {
                   {formatCurrency(summary.expected_cash)}
                 </div>
                 <p className="text-[10px] text-[#A09289] mt-1">
-                  Based on registered cash bills today
+                  Cash Sales ({formatCurrency(summary.cash_sales)}) - Cash Expenses ({formatCurrency(summary.cash_expenses || 0)})
                 </p>
               </div>
 

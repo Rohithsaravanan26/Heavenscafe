@@ -373,14 +373,42 @@ export interface StockMovement {
   profiles?: Profile
 }
 
+export interface StockInward {
+  id: string
+  shop_id: string
+  manager_id: string
+  product_id: string
+  quantity: number
+  unit_cost: number
+  total_cost: number
+  supplier_name: string | null
+  invoice_ref: string | null
+  notes: string | null
+  inward_date: string
+  created_at: string
+  products?: Product
+  profiles?: Profile
+}
+
 export interface Expense {
   id: string
   shop_id: string
-  category: 'rent' | 'electricity' | 'gas' | 'salary' | 'maintenance' | 'ingredients' | 'other'
+  category:
+    | 'ingredients'
+    | 'produce_dairy'
+    | 'packaging'
+    | 'gas'
+    | 'electricity'
+    | 'water'
+    | 'rent'
+    | 'salary'
+    | 'maintenance'
+    | 'other'
   description: string
   amount: number
   expense_date: string
   reference: string | null
+  payment_source?: 'cash_drawer' | 'online_upi' | 'bank_transfer' | 'owner_paid'
   recorded_by: string
   created_at: string
   updated_at: string

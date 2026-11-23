@@ -370,6 +370,138 @@ UPDATE products
       track_stock = TRUE
   WHERE cost_price = 0.00;
 
+-- ── 7. REMOTELY HANDLED TEA SHOP ARCHITECTURE (MIGRATION 014) ──
+-- Fix sales to profiles foreign key relationship for PostgREST
 DO $$ BEGIN
-  RAISE NOTICE 'Billzgo-Style Reconstruction Migration Completed Successfully!';
+  ALTER TABLE sales 
+    DROP CONSTRAINT IF EXISTS fk_sales_manager_profiles;
+  ALTER TABLE sales 
+    ADD CONSTRAINT fk_sales_manager_profiles 
+    FOREIGN KEY (manager_id) REFERENCES profiles(id) ON DELETE RESTRICT;
+EXCEPTION WHEN OTHERS THEN NULL;
+END $$;
+
+CREATE INDEX IF NOT EXISTS idx_sales_manager ON sales(manager_id);
+
+-- Enhance expenses table with payment_source & tea shop raw material categories
+ALTER TABLE expenses
+  ADD COLUMN IF NOT EXISTS payment_source TEXT NOT NULL DEFAULT 'cash_drawer' 
+  CHECK (payment_source IN ('cash_drawer', 'online_upi', 'bank_transfer', 'owner_paid'));
+
+ALTER TABLE expenses DROP CONSTRAINT IF EXISTS expenses_category_check;
+ALTER TABLE expenses ADD CONSTRAINT expenses_category_check CHECK (
+  category IN (
+    'ingredients',
+    'produce_dairy',
+    'packaging',
+    'gas',
+    'electricity',
+    'water',
+    'rent',
+    'salary',
+    'maintenance',
+    'other'
+  )
+);
+
+-- RLS: Allow SHOP_MANAGER to SELECT and INSERT expenses for their shop
+ALTER TABLE expenses ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "expenses_select" ON expenses;
+CREATE POLICY "expenses_select" ON expenses
+  FOR SELECT USING (shop_id = auth_shop_id());
+
+DROP POLICY IF EXISTS "expenses_insert" ON expenses;
+CREATE POLICY "expenses_insert" ON expenses
+  FOR INSERT WITH CHECK (shop_id = auth_shop_id());
+
+DROP POLICY IF EXISTS "expenses_admin_manage" ON expenses;
+CREATE POLICY "expenses_admin_manage" ON expenses
+  FOR ALL USING (shop_id = auth_shop_id() AND is_admin());
+
+-- Create stock_inwards table & atomic record_stock_inward RPC
+CREATE TABLE IF NOT EXISTS stock_inwards (
+  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  shop_id         UUID NOT NULL REFERENCES shops(id) ON DELETE CASCADE,
+  manager_id      UUID NOT NULL REFERENCES auth.users(id),
+  product_id      UUID NOT NULL REFERENCES products(id) ON DELETE RESTRICT,
+  quantity        INTEGER NOT NULL CHECK (quantity > 0),
+  unit_cost       NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+  total_cost      NUMERIC(10,2) NOT NULL DEFAULT 0.00,
+  supplier_name   TEXT,
+  invoice_ref     TEXT,
+  notes           TEXT,
+  inward_date     DATE NOT NULL DEFAULT CURRENT_DATE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+CREATE INDEX IF NOT EXISTS idx_stock_inwards_shop_date ON stock_inwards(shop_id, inward_date DESC);
+CREATE INDEX IF NOT EXISTS idx_stock_inwards_product ON stock_inwards(product_id);
+
+ALTER TABLE stock_inwards ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "stock_inwards_select" ON stock_inwards;
+CREATE POLICY "stock_inwards_select" ON stock_inwards
+  FOR SELECT USING (shop_id = auth_shop_id());
+
+DROP POLICY IF EXISTS "stock_inwards_insert" ON stock_inwards;
+CREATE POLICY "stock_inwards_insert" ON stock_inwards
+  FOR INSERT WITH CHECK (shop_id = auth_shop_id());
+
+CREATE OR REPLACE FUNCTION record_stock_inward(
+  p_shop_id       UUID,
+  p_manager_id    UUID,
+  p_product_id    UUID,
+  p_quantity      INTEGER,
+  p_unit_cost     NUMERIC DEFAULT 0.00,
+  p_supplier_name TEXT DEFAULT NULL,
+  p_invoice_ref   TEXT DEFAULT NULL,
+  p_notes         TEXT DEFAULT NULL
+)
+RETURNS JSONB
+LANGUAGE plpgsql SECURITY DEFINER
+AS $$
+DECLARE
+  v_inward_id UUID;
+  v_new_stock INTEGER;
+  v_prod_name TEXT;
+  v_cost      NUMERIC;
+BEGIN
+  SELECT name, cost_price INTO v_prod_name, v_cost
+    FROM products WHERE id = p_product_id AND shop_id = p_shop_id;
+  
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Product not found';
+  END IF;
+
+  IF p_unit_cost > 0 THEN
+    v_cost := p_unit_cost;
+  END IF;
+
+  INSERT INTO stock_inwards (
+    shop_id, manager_id, product_id, quantity, unit_cost, total_cost,
+    supplier_name, invoice_ref, notes
+  ) VALUES (
+    p_shop_id, p_manager_id, p_product_id, p_quantity, v_cost, (p_quantity * v_cost),
+    p_supplier_name, p_invoice_ref, p_notes
+  ) RETURNING id INTO v_inward_id;
+
+  UPDATE products
+    SET current_stock = current_stock + p_quantity,
+        cost_price = CASE WHEN p_unit_cost > 0 THEN p_unit_cost ELSE cost_price END
+    WHERE id = p_product_id
+    RETURNING current_stock INTO v_new_stock;
+
+  RETURN jsonb_build_object(
+    'inward_id', v_inward_id,
+    'product_name', v_prod_name,
+    'quantity_added', p_quantity,
+    'new_stock', v_new_stock,
+    'unit_cost', v_cost
+  );
+END;
+$$;
+
+DO $$ BEGIN
+  RAISE NOTICE 'Billzgo-Style & Remote Architecture Migration Completed Successfully!';
 END $$;

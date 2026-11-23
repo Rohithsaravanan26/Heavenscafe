@@ -1,6 +1,16 @@
 import * as React from "react"
 import Link from "next/link"
-import { Coffee, Receipt, FileText, Trash2, CalendarCheck, LogOut, Wifi } from "lucide-react"
+import {
+  Coffee,
+  Receipt,
+  FileText,
+  PackagePlus,
+  Wallet,
+  Trash2,
+  CalendarCheck,
+  LogOut,
+  Wifi,
+} from "lucide-react"
 import { getCurrentUser } from "@/lib/actions/auth"
 import { Button } from "@/components/ui/button"
 import { logoutAction } from "@/lib/actions/auth"
@@ -31,35 +41,47 @@ export default async function POSLayout({
                   Heaven&apos;s Cafe
                 </span>
                 <span className="text-[10px] tracking-widest text-[#737B52] font-semibold uppercase block">
-                  Shop POS Terminal
+                  Store POS &amp; Operations
                 </span>
               </div>
             </Link>
           </div>
 
-          {/* Operational Navigation (Streamlined Billzgo Cashier Flow) */}
-          <nav className="hidden md:flex items-center gap-1.5">
-            <Link href="/pos">
+          {/* Operational Navigation for On-Premises Store Manager */}
+          <nav className="hidden md:flex items-center gap-1">
+            <Link href="/pos" prefetch={true}>
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
                 <Receipt className="w-4 h-4 mr-1 text-[#B56C4A]" />
                 Billing
               </Button>
             </Link>
-            <Link href="/pos/bills">
+            <Link href="/pos/bills" prefetch={true}>
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
                 <FileText className="w-4 h-4 mr-1 text-[#705B51]" />
                 Previous Bills
               </Button>
             </Link>
-            <Link href="/pos/wastage">
+            <Link href="/pos/stock" prefetch={true}>
+              <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
+                <PackagePlus className="w-4 h-4 mr-1 text-[#737B52]" />
+                Inward Stock
+              </Button>
+            </Link>
+            <Link href="/pos/expenses" prefetch={true}>
+              <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
+                <Wallet className="w-4 h-4 mr-1 text-[#B56C4A]" />
+                Daily Expenses
+              </Button>
+            </Link>
+            <Link href="/pos/wastage" prefetch={true}>
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
                 <Trash2 className="w-4 h-4 mr-1 text-red-600" />
                 Day-End Wastage
               </Button>
             </Link>
-            <Link href="/pos/closing">
+            <Link href="/pos/closing" prefetch={true}>
               <Button variant="ghost" size="sm" className="text-xs font-semibold text-[#43291F] hover:bg-[#EFE7DA]">
-                <CalendarCheck className="w-4 h-4 mr-1 text-[#737B52]" />
+                <CalendarCheck className="w-4 h-4 mr-1 text-[#43291F]" />
                 Daily Closing
               </Button>
             </Link>
@@ -79,7 +101,7 @@ export default async function POSLayout({
                 {profile?.full_name || "Manager"}
               </p>
               <p className="text-[10px] text-[#705B51] leading-tight">
-                Cashier Terminal
+                Store Manager
               </p>
             </div>
 
@@ -100,23 +122,33 @@ export default async function POSLayout({
 
         {/* Mobile Sub-Navigation Bar */}
         <div className="flex md:hidden overflow-x-auto gap-1.5 pt-2 pb-1 scrollbar-none border-t border-[#E8DED0]/50 mt-2">
-          <Link href="/pos">
-            <span className="whitespace-nowrap px-3 py-1 rounded bg-[#EFE7DA] text-[#43291F] text-xs font-semibold inline-block">
+          <Link href="/pos" prefetch={true}>
+            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#EFE7DA] text-[#43291F] text-xs font-semibold inline-block">
               Billing
             </span>
           </Link>
-          <Link href="/pos/bills">
-            <span className="whitespace-nowrap px-3 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+          <Link href="/pos/bills" prefetch={true}>
+            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
               Bills
             </span>
           </Link>
-          <Link href="/pos/wastage">
-            <span className="whitespace-nowrap px-3 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
-              Day-End Wastage
+          <Link href="/pos/stock" prefetch={true}>
+            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+              Inward Stock
             </span>
           </Link>
-          <Link href="/pos/closing">
-            <span className="whitespace-nowrap px-3 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+          <Link href="/pos/expenses" prefetch={true}>
+            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+              Expenses
+            </span>
+          </Link>
+          <Link href="/pos/wastage" prefetch={true}>
+            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
+              Wastage
+            </span>
+          </Link>
+          <Link href="/pos/closing" prefetch={true}>
+            <span className="whitespace-nowrap px-2.5 py-1 rounded bg-[#FFFDF8] text-[#705B51] text-xs font-semibold border border-[#E8DED0] inline-block">
               Closing
             </span>
           </Link>

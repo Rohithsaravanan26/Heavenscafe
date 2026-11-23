@@ -45,6 +45,18 @@ export async function getTodayClosingSummary() {
     }
   }
 
+  // Sum today's cash drawer expenses
+  const { data: expenses } = await supabase
+    .from('expenses')
+    .select('amount, payment_source')
+    .eq('expense_date', today)
+
+  const cashExpenses = (expenses || [])
+    .filter((e) => e.payment_source === 'cash_drawer')
+    .reduce((sum, e) => sum + Number(e.amount || 0), 0)
+
+  const expectedCash = Math.max(0, cashSales - cashExpenses)
+
   // Check if today already has a closing record
   const { data: existingClosing } = await supabase
     .from('daily_closings')
@@ -59,7 +71,8 @@ export async function getTodayClosingSummary() {
     card_sales: Number(cardSales.toFixed(2)),
     other_sales: Number(otherSales.toFixed(2)),
     total_sales: Number(totalSales.toFixed(2)),
-    expected_cash: Number(cashSales.toFixed(2)),
+    cash_expenses: Number(cashExpenses.toFixed(2)),
+    expected_cash: Number(expectedCash.toFixed(2)),
     existing_closing: existingClosing,
   }
 }

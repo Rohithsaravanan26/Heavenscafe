@@ -51,14 +51,26 @@ export async function updateSession(request: NextRequest) {
 
   // Authenticated user
   if (user) {
-    // Fetch profile role
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('role, is_active')
-      .eq('id', user.id)
-      .single()
+    let role = request.cookies.get('hc_role')?.value
 
-    const role = profile?.role
+    // Only query database if role cookie is missing AND role check is needed
+    if (!role && (pathname.startsWith('/admin') || pathname === '/' || pathname === '/login')) {
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select('role, is_active')
+        .eq('id', user.id)
+        .single()
+
+      role = profile?.role
+      if (role) {
+        supabaseResponse.cookies.set('hc_role', role, {
+          path: '/',
+          httpOnly: true,
+          sameSite: 'lax',
+          maxAge: 60 * 60 * 24 * 7,
+        })
+      }
+    }
 
     // Role-based route enforcement
     if (role === 'SHOP_MANAGER' && pathname.startsWith('/admin')) {

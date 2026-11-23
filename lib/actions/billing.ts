@@ -379,7 +379,6 @@ export async function getSaleByInvoice(invoiceNo: string) {
     .from('sales')
     .select(`
       *,
-      profiles (full_name),
       sale_items (*),
       payments (*),
       receipt_print_logs (*)
@@ -387,7 +386,10 @@ export async function getSaleByInvoice(invoiceNo: string) {
     .eq('invoice_no', invoiceNo)
     .single()
 
-  if (error) return null
+  if (error) {
+    console.error('getSaleByInvoice error:', error.message)
+    return null
+  }
   return data
 }
 
@@ -398,13 +400,15 @@ export async function getRecentSales(limit = 50) {
     .from('sales')
     .select(`
       *,
-      profiles (full_name),
       sale_items (id, product_name, quantity, unit_price, subtotal),
-      payments (method, amount)
+      payments (method, amount, amount_tendered, change_amount, reference)
     `)
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error) return []
-  return data
+  if (error) {
+    console.error('getRecentSales error:', error.message)
+    return []
+  }
+  return data || []
 }

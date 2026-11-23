@@ -1,6 +1,7 @@
 'use server'
 
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { UserRole } from '@/types/database'
 
@@ -49,6 +50,15 @@ export async function loginAction(formData: FormData) {
     new_value: { role: profile.role },
   })
 
+  // Cache role in cookie for sub-millisecond edge middleware checks
+  const cookieStore = await cookies()
+  cookieStore.set('hc_role', profile.role, {
+    path: '/',
+    httpOnly: true,
+    sameSite: 'lax',
+    maxAge: 60 * 60 * 24 * 7,
+  })
+
   if (profile.role === 'ADMIN') {
     redirect('/admin')
   } else {
@@ -57,6 +67,8 @@ export async function loginAction(formData: FormData) {
 }
 
 export async function logoutAction() {
+  const cookieStore = await cookies()
+  cookieStore.delete('hc_role')
   const supabase = await createClient()
   await supabase.auth.signOut()
   redirect('/login')

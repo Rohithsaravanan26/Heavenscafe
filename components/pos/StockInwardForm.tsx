@@ -1,470 +1,427 @@
 "use client"
 
 import * as React from "react"
-import { PackagePlus, Plus, Trash2, ArrowRight, AlertTriangle, CheckCircle2 } from "lucide-react"
+import {
+  PackagePlus,
+  Boxes,
+  AlertTriangle,
+  CheckCircle2,
+  Search,
+  Truck,
+  FileText,
+  Clock,
+  ArrowRight,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select } from "@/components/ui/select"
-import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card"
-import { Alert, AlertDescription } from "@/components/ui/alert"
+import { Textarea } from "@/components/ui/textarea"
+import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { receiveStockAction } from "@/lib/actions/inventory"
-import { Ingredient, Supplier } from "@/types/database"
-import { formatCurrency } from "@/lib/utils"
+import { Alert, AlertDescription } from "@/components/ui/alert"
+import { recordStockInwardAction } from "@/lib/actions/inventory"
+import { formatCurrency, formatDateTime } from "@/lib/utils"
 
 interface StockInwardFormProps {
-  ingredients: Ingredient[]
-  suppliers: Supplier[]
+  products: any[]
+  initialInwards: any[]
 }
 
-interface InwardLine {
-  ingredientId: string
-  quantityPurchased: number
-  quantityReceived: number
-  unitCost: number
-  discrepancyReason: string
-}
-
-export function StockInwardForm({ ingredients, suppliers }: StockInwardFormProps) {
-  const [supplierId, setSupplierId] = React.useState<string>("")
-  const [referenceNo, setReferenceNo] = React.useState("")
+export function StockInwardForm({ products: initialProducts, initialInwards }: StockInwardFormProps) {
+  const [products, setProducts] = React.useState<any[]>(initialProducts)
+  const [inwards, setInwards] = React.useState<any[]>(initialInwards)
+  const [selectedProductId, setSelectedProductId] = React.useState<string>(products[0]?.id || "")
+  const [quantity, setQuantity] = React.useState<number>(50)
+  const [unitCost, setUnitCost] = React.useState<number>(0)
+  const [supplierName, setSupplierName] = React.useState("")
+  const [invoiceRef, setInvoiceRef] = React.useState("")
   const [notes, setNotes] = React.useState("")
-  const [lines, setLines] = React.useState<InwardLine[]>([
-    {
-      ingredientId: ingredients[0]?.id || "",
-      quantityPurchased: 1,
-      quantityReceived: 1,
-      unitCost: 0,
-      discrepancyReason: "",
-    },
-  ])
-  const [loading, setLoading] = React.useState(false)
-  const [message, setMessage] = React.useState<{ type: 'success' | 'error'; text: string } | null>(null)
+  const [search, setSearch] = React.useState("")
+  const [submitting, setSubmitting] = React.useState(false)
+  const [statusMsg, setStatusMsg] = React.useState<{ type: "success" | "error"; text: string } | null>(null)
 
-  const handleAddLine = () => {
-    setLines((prev) => [
-      ...prev,
-      {
-        ingredientId: ingredients[0]?.id || "",
-        quantityPurchased: 1,
-        quantityReceived: 1,
-        unitCost: 0,
-        discrepancyReason: "",
-      },
-    ])
-  }
+  const selectedProduct = React.useMemo(() => {
+    return products.find((p) => p.id === selectedProductId)
+  }, [products, selectedProductId])
 
-  const handleRemoveLine = (index: number) => {
-    setLines((prev) => prev.filter((_, i) => i !== index))
-  }
+  React.useEffect(() => {
+    if (selectedProduct) {
+      setUnitCost(Number(selectedProduct.cost_price) || 0)
+    }
+  }, [selectedProduct])
 
-  const handleLineChange = (index: number, field: keyof InwardLine, value: any) => {
-    setLines((prev) =>
-      prev.map((line, i) => (i === index ? { ...line, [field]: value } : line))
+  const lowStockItems = React.useMemo(() => {
+    return products.filter((p) => Number(p.current_stock ?? 0) <= Number(p.min_stock ?? 10))
+  }, [products])
+
+  const filteredProducts = React.useMemo(() => {
+    if (!search.trim()) return products
+    const q = search.toLowerCase()
+    return products.filter((p) =>
+      p.name.toLowerCase().includes(q) || p.menu_categories?.name?.toLowerCase().includes(q)
     )
-  }
+  }, [products, search])
 
-  // When purchased qty changes, by default sync received qty unless manager changes it
-  const handlePurchasedChange = (index: number, val: number) => {
-    setLines((prev) =>
-      prev.map((line, i) => {
-        if (i !== index) return line
-        const shouldSync = line.quantityReceived === line.quantityPurchased || line.quantityReceived === 0
-        return {
-          ...line,
-          quantityPurchased: val,
-          quantityReceived: shouldSync ? val : line.quantityReceived,
-        }
-      })
-    )
-  }
-
-  const summary = React.useMemo(() => {
-    let totalPurchasedVal = 0
-    let totalReceivedVal = 0
-    let missingCount = 0
-    let totalShortfallVal = 0
-
-    lines.forEach((line) => {
-      const pQty = Number(line.quantityPurchased) || 0
-      const rQty = Number(line.quantityReceived) || 0
-      const cost = Number(line.unitCost) || 0
-      totalPurchasedVal += pQty * cost
-      totalReceivedVal += rQty * cost
-
-      if (rQty < pQty) {
-        missingCount += 1
-        totalShortfallVal += (pQty - rQty) * cost
-      }
-    })
-
-    return { totalPurchasedVal, totalReceivedVal, missingCount, totalShortfallVal }
-  }, [lines])
+  const totalInwardValue = quantity * (unitCost > 0 ? unitCost : (selectedProduct?.cost_price || 0))
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setMessage(null)
+    if (!selectedProductId || quantity <= 0) return
 
-    if (lines.length === 0) {
-      setMessage({ type: 'error', text: 'Please add at least one ingredient to inward' })
-      return
-    }
+    setSubmitting(true)
+    setStatusMsg(null)
 
-    for (const l of lines) {
-      if (!l.ingredientId || l.quantityPurchased <= 0 || l.quantityReceived < 0 || l.unitCost < 0) {
-        setMessage({
-          type: 'error',
-          text: 'All line items must have valid ingredient, positive purchased quantity, non-negative received quantity, and valid cost.',
-        })
-        return
-      }
-
-      if (l.quantityReceived < l.quantityPurchased && !l.discrepancyReason.trim()) {
-        setMessage({
-          type: 'error',
-          text: 'Please provide a discrepancy note for any item where physical stock received is less than purchased.',
-        })
-        return
-      }
-    }
-
-    setLoading(true)
     try {
-      const res = await receiveStockAction({
-        supplier_id: supplierId || null,
-        reference_no: referenceNo.trim() || null,
+      const res = await recordStockInwardAction({
+        product_id: selectedProductId,
+        quantity,
+        unit_cost: unitCost,
+        supplier_name: supplierName.trim() || null,
+        invoice_ref: invoiceRef.trim() || null,
         notes: notes.trim() || null,
-        items: lines.map((l) => ({
-          ingredient_id: l.ingredientId,
-          quantity: Number(l.quantityReceived), // physical quantity
-          quantity_purchased: Number(l.quantityPurchased),
-          quantity_received: Number(l.quantityReceived),
-          unit_cost: Number(l.unitCost),
-          discrepancy_reason: l.discrepancyReason.trim() || null,
-        })),
       })
 
-      if (res.success) {
-        setMessage({
-          type: 'success',
-          text: `Stock inward recorded successfully! Physical stock of ${formatCurrency(summary.totalReceivedVal)} added to inventory. ${
-            summary.missingCount > 0
-              ? `⚠️ ${summary.missingCount} item(s) flagged as missing/shortfall for Admin review.`
-              : 'All items matched supplier invoice.'
-          }`,
-        })
-        setLines([
+      if (res.success && res.result) {
+        // Update local product stock
+        setProducts((prev) =>
+          prev.map((p) =>
+            p.id === selectedProductId ? { ...p, current_stock: res.result.new_stock } : p
+          )
+        )
+
+        // Prepend to inward list
+        setInwards((prev) => [
           {
-            ingredientId: ingredients[0]?.id || "",
-            quantityPurchased: 1,
-            quantityReceived: 1,
-            unitCost: 0,
-            discrepancyReason: "",
+            id: res.result.inward_id,
+            product_id: selectedProductId,
+            quantity,
+            unit_cost: unitCost,
+            total_cost: quantity * unitCost,
+            supplier_name: supplierName || "Direct Delivery",
+            invoice_ref: invoiceRef || null,
+            notes: notes || null,
+            created_at: new Date().toISOString(),
+            products: { name: selectedProduct?.name || "Product" },
+            profiles: { full_name: "Manager" },
           },
+          ...prev,
         ])
-        setReferenceNo("")
+
+        setStatusMsg({
+          type: "success",
+          text: `Successfully received +${quantity} units of ${selectedProduct?.name}. New stock: ${res.result.new_stock} units.`,
+        })
+
+        setSupplierName("")
+        setInvoiceRef("")
         setNotes("")
       } else {
-        setMessage({ type: 'error', text: res.error || 'Failed to receive stock' })
+        setStatusMsg({ type: "error", text: res.error || "Failed to record stock inward" })
       }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err)
-      setMessage({ type: 'error', text: msg })
     } finally {
-      setLoading(false)
+      setSubmitting(false)
     }
   }
 
   return (
-    <div className="max-w-4xl mx-auto space-y-6">
-      <div>
-        <h2 className="font-serif text-2xl font-bold text-[#43291F]">
-          Stock Inward & Physical Verification
-        </h2>
-        <p className="text-xs text-[#705B51]">
-          Record supplier delivery invoices and cross-verify with actual physical stock received at Heaven&apos;s Cafe
-        </p>
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+        <div>
+          <h1 className="font-serif text-2xl font-bold text-[#43291F] flex items-center gap-2">
+            <PackagePlus className="w-6 h-6 text-[#737B52]" />
+            Stock Inward &amp; Delivery Receiving
+          </h1>
+          <p className="text-xs text-[#705B51] mt-0.5">
+            Manager counter interface: Receive physical product shipments, puffs, bakery goods &amp; raw materials
+          </p>
+        </div>
+
+        {lowStockItems.length > 0 && (
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-100 text-red-900 text-xs font-bold border border-red-200">
+            <AlertTriangle className="w-4 h-4 text-red-700 animate-pulse" />
+            <span>{lowStockItems.length} product{lowStockItems.length > 1 ? "s" : ""} low in stock</span>
+          </div>
+        )}
       </div>
 
-      <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm">
-        <CardHeader className="border-b border-[#E8DED0] pb-4">
-          <CardTitle className="text-lg text-[#43291F] flex items-center gap-2">
-            <PackagePlus className="w-5 h-5 text-[#737B52]" />
-            Receive & Verify Delivery
-          </CardTitle>
-          <CardDescription>
-            Enter the invoice quantity from the supplier and the physical quantity you counted on delivery. Any missing items will be highlighted and logged for Admin cross-verification.
-          </CardDescription>
-        </CardHeader>
+      {statusMsg && (
+        <Alert variant={statusMsg.type === "success" ? "olive" : "destructive"}>
+          <AlertDescription>{statusMsg.text}</AlertDescription>
+        </Alert>
+      )}
 
-        <CardContent className="p-6">
-          {message && (
-            <Alert
-              variant={message.type === 'success' ? 'olive' : 'destructive'}
-              className="mb-6"
-            >
-              <AlertDescription>{message.text}</AlertDescription>
-            </Alert>
+      {/* Main Grid: Form on Left, Stock Watch & Log on Right */}
+      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+        {/* Left Column: Delivery Receive Form */}
+        <div className="lg:col-span-5 space-y-4">
+          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm">
+            <CardHeader className="p-4 border-b border-[#E8DED0] bg-[#F8F3E9]">
+              <CardTitle className="font-serif text-base text-[#43291F] flex items-center gap-2">
+                <Truck className="w-4 h-4 text-[#B56C4A]" />
+                Receive Physical Stock
+              </CardTitle>
+            </CardHeader>
+
+            <CardContent className="p-4">
+              <form onSubmit={handleSubmit} className="space-y-4">
+                {/* Product Selector */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="product" className="text-xs font-bold text-[#43291F]">
+                    Select Delivered Product *
+                  </Label>
+                  <Select
+                    id="product"
+                    value={selectedProductId}
+                    onChange={(e) => setSelectedProductId(e.target.value)}
+                    required
+                    className="h-10 text-xs font-semibold"
+                  >
+                    {products.map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name} (Stock: {p.current_stock ?? 0} left)
+                      </option>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Current Stock Preview Card */}
+                {selectedProduct && (
+                  <div className="p-3 rounded-lg bg-[#F8F3E9] border border-[#E8DED0] flex items-center justify-between text-xs">
+                    <div>
+                      <span className="text-[#705B51] block">Current Store Stock:</span>
+                      <span className="font-serif font-bold text-base text-[#43291F] font-mono">
+                        {selectedProduct.current_stock ?? 0} units
+                      </span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[#705B51] block">Cost Price (CP):</span>
+                      <span className="font-serif font-bold text-base text-[#737B52] font-mono">
+                        {formatCurrency(selectedProduct.cost_price || 0)}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Quantity with Touch Presets */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="qty" className="text-xs font-bold text-[#43291F]">
+                    Delivered Quantity (Units) *
+                  </Label>
+                  <Input
+                    id="qty"
+                    type="number"
+                    min="1"
+                    value={quantity}
+                    onChange={(e) => setQuantity(parseInt(e.target.value, 10) || 0)}
+                    required
+                    className="font-mono text-base font-bold h-10"
+                  />
+                  <div className="flex gap-1.5 pt-1">
+                    {[+10, +25, +50, +100, +200].map((preset) => (
+                      <button
+                        key={preset}
+                        type="button"
+                        onClick={() => setQuantity((prev) => Math.max(1, prev + preset))}
+                        className="px-2.5 py-1 rounded bg-[#EFE7DA] text-xs font-bold text-[#43291F] hover:bg-[#E8DED0] cursor-pointer"
+                      >
+                        +{preset}
+                      </button>
+                    ))}
+                    <button
+                      type="button"
+                      onClick={() => setQuantity(50)}
+                      className="px-2 py-1 rounded bg-[#F8F3E9] text-[10px] text-[#705B51] hover:bg-[#EFE7DA] border border-[#E8DED0]"
+                    >
+                      Reset 50
+                    </button>
+                  </div>
+                </div>
+
+                {/* Unit Cost & Total Value */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="cost" className="text-xs font-bold text-[#43291F]">
+                      Unit Cost (₹)
+                    </Label>
+                    <Input
+                      id="cost"
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={unitCost}
+                      onChange={(e) => setUnitCost(parseFloat(e.target.value) || 0)}
+                      className="font-mono text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label className="text-xs font-bold text-[#43291F]">
+                      Total Shipment Cost
+                    </Label>
+                    <div className="h-9 px-3 rounded-md bg-[#F8F3E9] border border-[#E8DED0] flex items-center font-mono font-bold text-xs text-[#737B52]">
+                      {formatCurrency(totalInwardValue)}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Supplier & Invoice */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="supplier" className="text-xs text-[#705B51]">
+                      Supplier / Vendor
+                    </Label>
+                    <Input
+                      id="supplier"
+                      placeholder="e.g. Aavin Dairy"
+                      value={supplierName}
+                      onChange={(e) => setSupplierName(e.target.value)}
+                      className="text-xs"
+                    />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label htmlFor="ref" className="text-xs text-[#705B51]">
+                      Challan / Bill Ref
+                    </Label>
+                    <Input
+                      id="ref"
+                      placeholder="e.g. INV-492"
+                      value={invoiceRef}
+                      onChange={(e) => setInvoiceRef(e.target.value)}
+                      className="text-xs font-mono"
+                    />
+                  </div>
+                </div>
+
+                {/* Delivery Notes */}
+                <div className="space-y-1.5">
+                  <Label htmlFor="notes" className="text-xs text-[#705B51]">
+                    Manager Notes (Optional)
+                  </Label>
+                  <Textarea
+                    id="notes"
+                    placeholder="Received fresh morning batch, packed well..."
+                    rows={2}
+                    value={notes}
+                    onChange={(e) => setNotes(e.target.value)}
+                    className="text-xs"
+                  />
+                </div>
+
+                <Button
+                  type="submit"
+                  disabled={submitting || quantity <= 0}
+                  className="w-full h-11 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm shadow-sm"
+                >
+                  {submitting ? "Updating Store Stock..." : `Confirm Inward (+${quantity} units)`}
+                </Button>
+              </form>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Right Column: Low-Stock Alerts & Inwards History */}
+        <div className="lg:col-span-7 space-y-4">
+          {/* Low Stock Warning Banner */}
+          {lowStockItems.length > 0 && (
+            <Card className="border-2 border-red-300 bg-red-50/70 shadow-xs">
+              <CardContent className="p-3.5">
+                <div className="flex items-center gap-2 mb-2">
+                  <AlertTriangle className="w-4 h-4 text-red-700" />
+                  <span className="text-xs font-bold text-red-950">
+                    Low Stock Alert — Place Supplier Orders For:
+                  </span>
+                </div>
+                <div className="flex flex-wrap gap-1.5">
+                  {lowStockItems.map((p) => (
+                    <button
+                      key={p.id}
+                      type="button"
+                      onClick={() => {
+                        setSelectedProductId(p.id)
+                        setQuantity(50)
+                      }}
+                      className="px-2 py-1 rounded bg-white text-[11px] font-bold text-red-800 border border-red-200 hover:bg-red-100 flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>{p.name}</span>
+                      <span className="px-1.5 py-0.2 rounded-full bg-red-700 text-white text-[9px]">
+                        {p.current_stock ?? 0} left
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
           )}
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            {/* Header info */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              <div className="space-y-1.5">
-                <Label htmlFor="supplier">Supplier</Label>
-                <Select
-                  id="supplier"
-                  value={supplierId}
-                  onChange={(e) => setSupplierId(e.target.value)}
-                >
-                  <option value="">Select Supplier (Optional)</option>
-                  {suppliers.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name} {s.phone ? `(${s.phone})` : ""}
-                    </option>
+          {/* Recent Inwards Received Table */}
+          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
+            <CardHeader className="p-4 border-b border-[#E8DED0] bg-[#F8F3E9] flex flex-row items-center justify-between">
+              <CardTitle className="font-serif text-base text-[#43291F] flex items-center gap-2">
+                <Clock className="w-4 h-4 text-[#737B52]" />
+                Recent Inward Deliveries Received
+              </CardTitle>
+              <Badge variant="outline" className="text-[10px]">
+                {inwards.length} records
+              </Badge>
+            </CardHeader>
+
+            <div className="overflow-x-auto max-h-[500px]">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F8F3E9]/50 border-b border-[#E8DED0] font-serif font-bold text-[#43291F] sticky top-0">
+                  <tr>
+                    <th className="py-2.5 px-3">Date</th>
+                    <th className="py-2.5 px-3">Product</th>
+                    <th className="py-2.5 px-3 text-center">Qty Added</th>
+                    <th className="py-2.5 px-3 text-right">Unit CP</th>
+                    <th className="py-2.5 px-3 text-right">Total Cost</th>
+                    <th className="py-2.5 px-3">Supplier / Ref</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E8DED0]">
+                  {inwards.map((item) => (
+                    <tr key={item.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
+                      <td className="py-2.5 px-3 text-[#705B51] whitespace-nowrap">
+                        {formatDateTime(item.created_at)}
+                      </td>
+                      <td className="py-2.5 px-3 font-serif font-bold text-[#43291F]">
+                        {item.products?.name || "Product"}
+                      </td>
+                      <td className="py-2.5 px-3 text-center">
+                        <span className="px-2 py-0.5 rounded-full bg-emerald-100 text-emerald-800 font-bold text-[11px]">
+                          +{item.quantity}
+                        </span>
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono text-[#705B51]">
+                        {formatCurrency(item.unit_cost || 0)}
+                      </td>
+                      <td className="py-2.5 px-3 text-right font-mono font-bold text-[#43291F]">
+                        {formatCurrency(item.total_cost || 0)}
+                      </td>
+                      <td className="py-2.5 px-3 text-[#705B51]">
+                        <div>{item.supplier_name || "Direct Delivery"}</div>
+                        {item.invoice_ref && (
+                          <div className="text-[10px] text-[#A09289] font-mono">{item.invoice_ref}</div>
+                        )}
+                      </td>
+                    </tr>
                   ))}
-                </Select>
-              </div>
+                </tbody>
+              </table>
 
-              <div className="space-y-1.5">
-                <Label htmlFor="ref">Supplier Invoice / Bill No</Label>
-                <Input
-                  id="ref"
-                  placeholder="e.g. INV-2026-908"
-                  value={referenceNo}
-                  onChange={(e) => setReferenceNo(e.target.value)}
-                />
-              </div>
-
-              <div className="space-y-1.5">
-                <Label htmlFor="notes">Delivery Condition / Notes</Label>
-                <Input
-                  id="notes"
-                  placeholder="e.g. Received at 10 AM, sealed packaging"
-                  value={notes}
-                  onChange={(e) => setNotes(e.target.value)}
-                />
-              </div>
+              {inwards.length === 0 && (
+                <div className="py-12 text-center text-[#A09289]">
+                  <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" />
+                  <p className="font-serif font-bold text-sm text-[#43291F]">No Stock Inwards Yet</p>
+                  <p className="text-xs text-[#705B51] mt-0.5">Use the form on the left to receive today&apos;s deliveries.</p>
+                </div>
+              )}
             </div>
-
-            {/* Line items list */}
-            <div className="space-y-3">
-              <div className="flex items-center justify-between">
-                <div>
-                  <h4 className="font-serif font-bold text-sm text-[#43291F]">
-                    Delivered Items ({lines.length})
-                  </h4>
-                  <p className="text-[11px] text-[#705B51]">
-                    Verify billed amount against physically received count
-                  </p>
-                </div>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={handleAddLine}
-                  className="h-8 text-xs border-[#E8DED0] hover:bg-[#F8F3E9] text-[#43291F]"
-                >
-                  <Plus className="w-3.5 h-3.5 mr-1 text-[#737B52]" />
-                  Add Another Item
-                </Button>
-              </div>
-
-              <div className="space-y-3">
-                {lines.map((line, idx) => {
-                  const selectedIng = ingredients.find((i) => i.id === line.ingredientId)
-                  const pQty = Number(line.quantityPurchased) || 0
-                  const rQty = Number(line.quantityReceived) || 0
-                  const diff = rQty - pQty
-                  const isMissing = diff < -0.001
-                  const isExcess = diff > 0.001
-                  const isMatched = !isMissing && !isExcess
-
-                  return (
-                    <div
-                      key={idx}
-                      className={`p-3.5 rounded-lg border transition-all ${
-                        isMissing
-                          ? "bg-red-50/60 border-red-200"
-                          : isExcess
-                          ? "bg-blue-50/60 border-blue-200"
-                          : "bg-[#F8F3E9]/80 border-[#E8DED0]"
-                      }`}
-                    >
-                      <div className="grid grid-cols-12 gap-3 items-center">
-                        {/* Ingredient selector */}
-                        <div className="col-span-12 sm:col-span-4">
-                          <Label className="text-[10px] block mb-1 font-semibold text-[#43291F]">
-                            Raw Ingredient / Product
-                          </Label>
-                          <Select
-                            value={line.ingredientId}
-                            onChange={(e) => handleLineChange(idx, "ingredientId", e.target.value)}
-                            className="h-9 text-xs"
-                          >
-                            {ingredients.map((i) => (
-                              <option key={i.id} value={i.id}>
-                                {i.name} (Current: {i.current_stock} {i.unit})
-                              </option>
-                            ))}
-                          </Select>
-                        </div>
-
-                        {/* Purchased/Billed Qty */}
-                        <div className="col-span-6 sm:col-span-2">
-                          <Label className="text-[10px] block mb-1 font-semibold text-[#705B51]">
-                            Billed Qty ({selectedIng?.unit || "unit"})
-                          </Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0.01"
-                            placeholder="0.00"
-                            value={line.quantityPurchased}
-                            onChange={(e) => handlePurchasedChange(idx, Number(e.target.value))}
-                            className="h-9 text-xs"
-                          />
-                        </div>
-
-                        {/* Physically Received Qty */}
-                        <div className="col-span-6 sm:col-span-2">
-                          <Label className="text-[10px] block mb-1 font-semibold text-[#43291F]">
-                            Physical Qty ({selectedIng?.unit || "unit"})
-                          </Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={line.quantityReceived}
-                            onChange={(e) => handleLineChange(idx, "quantityReceived", Number(e.target.value))}
-                            className={`h-9 text-xs font-semibold ${
-                              isMissing ? "border-red-400 text-red-700 bg-red-50" : ""
-                            }`}
-                          />
-                        </div>
-
-                        {/* Unit Cost */}
-                        <div className="col-span-6 sm:col-span-2">
-                          <Label className="text-[10px] block mb-1 font-semibold text-[#705B51]">
-                            Cost / Unit (₹)
-                          </Label>
-                          <Input
-                            type="number"
-                            step="0.01"
-                            min="0"
-                            placeholder="0.00"
-                            value={line.unitCost}
-                            onChange={(e) => handleLineChange(idx, "unitCost", Number(e.target.value))}
-                            className="h-9 text-xs"
-                          />
-                        </div>
-
-                        {/* Status Badge & Actions */}
-                        <div className="col-span-6 sm:col-span-2 flex items-center justify-between sm:justify-end gap-2 pt-4">
-                          <div>
-                            {isMatched && (
-                              <Badge variant="olive" className="text-[10px] px-2 py-0.5">
-                                <CheckCircle2 className="w-3 h-3 mr-1 inline" /> Matched
-                              </Badge>
-                            )}
-                            {isMissing && (
-                              <Badge variant="destructive" className="text-[10px] px-2 py-0.5">
-                                <AlertTriangle className="w-3 h-3 mr-1 inline" /> {diff.toFixed(2)} {selectedIng?.unit} Missing
-                              </Badge>
-                            )}
-                            {isExcess && (
-                              <Badge variant="outline" className="text-[10px] px-2 py-0.5 border-blue-400 text-blue-700">
-                                +{diff.toFixed(2)} {selectedIng?.unit} Excess
-                              </Badge>
-                            )}
-                          </div>
-
-                          <button
-                            type="button"
-                            onClick={() => handleRemoveLine(idx)}
-                            disabled={lines.length === 1}
-                            className="text-[#A09289] hover:text-red-700 disabled:opacity-30 p-1"
-                            title="Remove line"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* If missing items, require reason */}
-                      {isMissing && (
-                        <div className="mt-2.5 pt-2 border-t border-red-200 grid grid-cols-12 gap-2 items-center">
-                          <div className="col-span-12 sm:col-span-3 text-[11px] font-semibold text-red-700 flex items-center gap-1">
-                            <AlertTriangle className="w-3.5 h-3.5" />
-                            Missing Item Reason:
-                          </div>
-                          <div className="col-span-12 sm:col-span-9">
-                            <Input
-                              placeholder="e.g. Leaked packet during delivery / Supplier short shipped 2 units"
-                              value={line.discrepancyReason}
-                              onChange={(e) => handleLineChange(idx, "discrepancyReason", e.target.value)}
-                              className="h-8 text-xs bg-white border-red-300 placeholder:text-red-300"
-                            />
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-
-            {/* Discrepancy warning banner */}
-            {summary.missingCount > 0 && (
-              <div className="p-3.5 rounded-lg bg-red-50 border border-red-200 text-red-800 text-xs flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <AlertTriangle className="w-4 h-4 text-red-600 shrink-0" />
-                  <span>
-                    <strong>Missing Stock Detected:</strong> {summary.missingCount} item(s) short of billed quantity. Estimated supplier shortfall value: <strong>{formatCurrency(summary.totalShortfallVal)}</strong>.
-                  </span>
-                </div>
-                <span className="text-[10px] font-bold uppercase tracking-wider text-red-600 bg-red-100 px-2 py-1 rounded">
-                  Admin Alerted
-                </span>
-              </div>
-            )}
-
-            {/* Total Summary & Submit */}
-            <div className="flex flex-col sm:flex-row items-center justify-between gap-4 pt-4 border-t border-[#E8DED0]">
-              <div className="flex items-center gap-6">
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-[#705B51] block">
-                    Billed Invoice Value:
-                  </span>
-                  <span className="font-serif text-lg font-bold text-[#705B51]">
-                    {formatCurrency(summary.totalPurchasedVal)}
-                  </span>
-                </div>
-                <div className="h-8 w-px bg-[#E8DED0]" />
-                <div>
-                  <span className="text-[10px] uppercase font-bold tracking-wider text-[#737B52] block">
-                    Physical Stock Added:
-                  </span>
-                  <span className="font-serif text-2xl font-bold text-[#43291F]">
-                    {formatCurrency(summary.totalReceivedVal)}
-                  </span>
-                </div>
-              </div>
-
-              <Button
-                type="submit"
-                disabled={loading || lines.length === 0}
-                className="w-full sm:w-auto h-11 px-8 bg-[#43291F] hover:bg-[#341F17] text-white font-bold text-sm"
-              >
-                {loading ? "Recording Physical Inward..." : "Confirm & Update Inventory"}
-                <ArrowRight className="w-4 h-4 ml-2" />
-              </Button>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
+          </Card>
+        </div>
+      </div>
     </div>
   )
 }

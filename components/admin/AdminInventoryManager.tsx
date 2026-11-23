@@ -13,6 +13,7 @@ import {
   TrendingDown,
   RefreshCw,
   PackageCheck,
+  Truck,
 } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -27,15 +28,18 @@ import { formatCurrency, formatDateTime } from "@/lib/utils"
 interface AdminInventoryManagerProps {
   products: any[]
   wastages: any[]
+  inwards?: any[]
 }
 
 export function AdminInventoryManager({
   products: initialProducts,
   wastages: initialWastages,
+  inwards: initialInwards = [],
 }: AdminInventoryManagerProps) {
   const [products, setProducts] = React.useState<any[]>(initialProducts)
   const [wastages, setWastages] = React.useState<any[]>(initialWastages)
-  const [activeTab, setActiveTab] = React.useState<"stocks" | "wastage">("stocks")
+  const [inwards, setInwards] = React.useState<any[]>(initialInwards)
+  const [activeTab, setActiveTab] = React.useState<"stocks" | "wastage" | "inwards">("stocks")
   const [search, setSearch] = React.useState("")
   const [onlyLowStock, setOnlyLowStock] = React.useState(false)
 
@@ -145,6 +149,17 @@ export function AdminInventoryManager({
             )}
           </button>
           <button
+            onClick={() => setActiveTab("inwards")}
+            className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+              activeTab === "inwards"
+                ? "bg-[#43291F] text-white shadow-xs"
+                : "text-[#705B51] hover:text-[#43291F]"
+            }`}
+          >
+            <Truck className="w-3.5 h-3.5" />
+            Inward Deliveries Audit ({inwards.length})
+          </button>
+          <button
             onClick={() => setActiveTab("wastage")}
             className={`px-3 py-1.5 rounded-md text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
               activeTab === "wastage"
@@ -153,7 +168,7 @@ export function AdminInventoryManager({
             }`}
           >
             <Trash2 className="w-3.5 h-3.5" />
-            Day-End Wastage &amp; Loss ({wastages.length})
+            Day-End Wastage ({wastages.length})
           </button>
         </div>
       </div>
@@ -349,6 +364,134 @@ export function AdminInventoryManager({
                 <Boxes className="w-8 h-8 mx-auto mb-2 opacity-40" />
                 <p className="font-serif font-bold text-base text-[#43291F]">No Products Found</p>
                 <p className="text-xs text-[#705B51] mt-1">Try adjusting your search query.</p>
+              </div>
+            )}
+          </Card>
+        </div>
+      )}
+
+      {/* ── TAB 3: INWARD DELIVERIES AUDIT (Remote Owner View) ── */}
+      {activeTab === "inwards" && (
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#737B52]">
+                Total Shipments Logged
+              </span>
+              <p className="font-serif text-2xl font-bold text-[#43291F] mt-1 font-mono">
+                {inwards.length}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Physical deliveries received</p>
+            </Card>
+
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#737B52]">
+                Total Units Inwarded
+              </span>
+              <p className="font-serif text-2xl font-bold text-[#43291F] mt-1 font-mono">
+                {inwards.reduce((acc, i) => acc + Number(i.quantity || 0), 0)}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Added to store inventory</p>
+            </Card>
+
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#B56C4A]">
+                Total Inward Valuation
+              </span>
+              <p className="font-serif text-2xl font-bold text-[#B56C4A] mt-1 font-mono">
+                {formatCurrency(inwards.reduce((acc, i) => acc + Number(i.total_cost || 0), 0))}
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Manufacturing cost of stock</p>
+            </Card>
+
+            <Card className="border-[#E8DED0] bg-[#FFFDF8] p-4 shadow-xs">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-[#705B51]">
+                Store Manager Status
+              </span>
+              <p className="font-serif text-base font-bold text-emerald-800 mt-2 flex items-center gap-1.5">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600" />
+                Active at Counter
+              </p>
+              <p className="text-[11px] text-[#705B51] mt-0.5">Receives deliveries on tablet</p>
+            </Card>
+          </div>
+
+          {/* Inwards History Table */}
+          <Card className="border-[#E8DED0] bg-[#FFFDF8] shadow-sm overflow-hidden">
+            <CardHeader className="p-4 border-b border-[#E8DED0] bg-[#F8F3E9] flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="font-serif text-base font-bold text-[#43291F]">
+                  Manager Inward Deliveries Audit Log
+                </CardTitle>
+                <p className="text-xs text-[#705B51] mt-0.5">
+                  Remote verification of stock received physically at the shop counter by store manager
+                </p>
+              </div>
+              <Badge variant="outline" className="text-[10px]">
+                {inwards.length} shipments
+              </Badge>
+            </CardHeader>
+
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-[#F8F3E9]/50 border-b border-[#E8DED0] font-serif font-bold text-[#43291F]">
+                  <tr>
+                    <th className="py-3 px-4">Date &amp; Time</th>
+                    <th className="py-3 px-4">Product Name</th>
+                    <th className="py-3 px-4 text-center">Qty Added</th>
+                    <th className="py-3 px-4 text-right">Unit CP</th>
+                    <th className="py-3 px-4 text-right">Total Cost</th>
+                    <th className="py-3 px-4">Supplier / Vendor</th>
+                    <th className="py-3 px-4">Challan / Ref</th>
+                    <th className="py-3 px-4">Received By</th>
+                    <th className="py-3 px-4">Notes</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-[#E8DED0]">
+                  {inwards.map((i) => (
+                    <tr key={i.id} className="hover:bg-[#F8F3E9]/50 transition-colors">
+                      <td className="py-3 px-4 text-[#705B51] whitespace-nowrap">
+                        {formatDateTime(i.created_at)}
+                      </td>
+                      <td className="py-3 px-4 font-serif font-bold text-sm text-[#43291F]">
+                        {i.products?.name || "Product"}
+                      </td>
+                      <td className="py-3 px-4 text-center font-bold">
+                        <span className="px-2.5 py-0.5 rounded-full bg-emerald-100 text-emerald-800 text-[11px]">
+                          +{i.quantity} units
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono text-[#705B51]">
+                        {formatCurrency(i.unit_cost || 0)}
+                      </td>
+                      <td className="py-3 px-4 text-right font-mono font-bold text-[#43291F]">
+                        {formatCurrency(i.total_cost || 0)}
+                      </td>
+                      <td className="py-3 px-4 font-semibold text-[#43291F]">
+                        {i.supplier_name || "Direct Vendor"}
+                      </td>
+                      <td className="py-3 px-4 font-mono text-[#705B51]">
+                        {i.invoice_ref || "—"}
+                      </td>
+                      <td className="py-3 px-4 text-[#705B51]">
+                        {i.profiles?.full_name || "Store Manager"}
+                      </td>
+                      <td className="py-3 px-4 text-[#705B51] max-w-xs truncate">
+                        {i.notes || "—"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
+            {inwards.length === 0 && (
+              <div className="py-14 text-center text-[#A09289]">
+                <Truck className="w-8 h-8 mx-auto mb-2 opacity-40 text-[#737B52]" />
+                <p className="font-serif font-bold text-base text-[#43291F]">No Inwards Recorded Yet</p>
+                <p className="text-xs text-[#705B51] mt-1">
+                  Deliveries received by the store manager on the POS Inward tab will appear here.
+                </p>
               </div>
             )}
           </Card>
