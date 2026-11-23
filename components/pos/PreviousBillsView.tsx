@@ -171,11 +171,17 @@ export function PreviousBillsView({
         </div>
 
         {filteredSales.length === 0 && (
-          <div className="py-12 text-center text-[#A09289]">
-            <Receipt className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p className="text-xs font-semibold">No bills found</p>
-            <p className="text-[11px] text-[#705B51] mt-0.5">
-              Completed transactions will appear here.
+          <div className="py-14 text-center">
+            <div className="w-12 h-12 rounded-full bg-[#FAF0EB] text-[#B56C4A] mx-auto flex items-center justify-center mb-3">
+              <Receipt className="w-6 h-6" />
+            </div>
+            <p className="font-serif font-bold text-base text-[#43291F]">
+              {search ? "No bills match your search" : "No Previous Bills Yet"}
+            </p>
+            <p className="text-xs text-[#705B51] mt-1 max-w-sm mx-auto">
+              {search
+                ? "Try searching by invoice number, customer name, or payment method."
+                : "Transactions completed at the POS counter will appear here immediately for quick receipt reprint and customer auditing."}
             </p>
           </div>
         )}

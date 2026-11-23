@@ -199,10 +199,18 @@ export function AdminSalesHistory({
         </div>
 
         {filteredSales.length === 0 && (
-          <div className="py-14 text-center text-[#A09289]">
-            <Receipt className="w-8 h-8 mx-auto mb-2 opacity-40" />
-            <p className="font-serif font-bold text-base text-[#43291F]">No sales match your search</p>
-            <p className="text-xs text-[#705B51] mt-1">Try clearing filters to see all completed transactions.</p>
+          <div className="py-14 text-center">
+            <div className="w-12 h-12 rounded-full bg-[#FAF0EB] text-[#B56C4A] mx-auto flex items-center justify-center mb-3">
+              <Receipt className="w-6 h-6" />
+            </div>
+            <p className="font-serif font-bold text-base text-[#43291F]">
+              {search || methodFilter !== "all" ? "No sales match your search" : "No Commercial Sales Recorded Yet"}
+            </p>
+            <p className="text-xs text-[#705B51] mt-1 max-w-sm mx-auto">
+              {search || methodFilter !== "all"
+                ? "Try clearing filters to see all completed transactions."
+                : "Real-time orders processed at the store POS counter will automatically populate this audit register."}
+            </p>
           </div>
         )}
       </Card>
