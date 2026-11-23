@@ -68,11 +68,11 @@ export function AdminInventoryManager({
   }, [wastages, todayStr])
 
   const todayWastageLoss = React.useMemo(() => {
-    return todayWastages.reduce((acc, w) => acc + Number(w.total_cost_loss || 0), 0)
+    return todayWastages.reduce((acc, w) => acc + Number(w.total_loss || w.total_cost_loss || 0), 0)
   }, [todayWastages])
 
   const totalWastageLoss = React.useMemo(() => {
-    return wastages.reduce((acc, w) => acc + Number(w.total_cost_loss || 0), 0)
+    return wastages.reduce((acc, w) => acc + Number(w.total_loss || w.total_cost_loss || 0), 0)
   }, [wastages])
 
   const filteredProducts = React.useMemo(() => {
@@ -427,7 +427,7 @@ export function AdminInventoryManager({
                 </thead>
                 <tbody className="divide-y divide-[#E8DED0]">
                   {wastages.map((w) => {
-                    const loss = Number(w.total_cost_loss || 0)
+                    const loss = Number(w.total_loss || w.total_cost_loss || 0)
                     const cp = Number(w.cost_price || 0)
 
                     return (
