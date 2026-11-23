@@ -146,7 +146,7 @@ export function formatReceiptPlainText(data: ReceiptData, paperWidth: 58 | 80 = 
     lines.push(padCenter(f))
   }
   lines.push(divider)
-  lines.push('\n\n\n') // Paper cut margin
+  lines.push('\n') // Clean paper cut feed (avoiding multi-page overflow)
 
   return lines.join('\n')
 }

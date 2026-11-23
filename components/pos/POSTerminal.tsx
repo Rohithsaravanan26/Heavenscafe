@@ -707,7 +707,7 @@ export function POSTerminal({
             </div>
 
             <div className="flex-1 overflow-y-auto p-2.5 sm:p-3 bg-white rounded-lg border border-[#E8DED0] text-xs font-mono max-h-[50dvh]">
-              <ThermalReceipt receipt={completedReceipt} paperWidth={paperWidth} />
+              <ThermalReceipt receipt={completedReceipt} paperWidth={paperWidth} hideActions />
             </div>
 
             <div className="flex gap-2 shrink-0 pt-1">

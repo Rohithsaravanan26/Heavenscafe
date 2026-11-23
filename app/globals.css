@@ -93,14 +93,18 @@ h1, h2, h3, h4, .font-heading {
 @media print {
   @page {
     margin: 0;
-    size: 80mm auto;
+    size: auto;
   }
 
-  body {
+  html, body {
     background: #FFFFFF !important;
     color: #000000 !important;
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
+    min-height: 0 !important;
+    max-height: 100% !important;
+    overflow: hidden !important;
   }
 
   body * {
@@ -113,23 +117,27 @@ h1, h2, h3, h4, .font-heading {
   }
 
   #receipt-print-area {
-    position: absolute;
+    position: fixed;
     left: 0;
     top: 0;
     width: 80mm;
     margin: 0;
-    padding: 3mm 4mm;
+    padding: 2mm 3mm;
     background: #FFFFFF;
     color: #000000;
     font-family: 'Courier New', Courier, monospace;
     font-size: 11px;
-    line-height: 1.25;
+    line-height: 1.2;
+    page-break-after: avoid !important;
+    page-break-inside: avoid !important;
+    break-after: avoid !important;
+    break-inside: avoid !important;
   }
 
   .paper-58mm #receipt-print-area,
   #receipt-print-area.paper-58mm {
     width: 58mm !important;
     font-size: 10px !important;
-    padding: 2mm 2.5mm !important;
+    padding: 1.5mm 2mm !important;
   }
 }

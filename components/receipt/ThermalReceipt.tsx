@@ -14,6 +14,7 @@ interface ThermalReceiptProps {
   printerName?: string | null
   connectionType?: 'browser' | 'qz_tray' | 'network'
   onClose?: () => void
+  hideActions?: boolean
 }
 
 export function ThermalReceipt({
@@ -22,6 +23,7 @@ export function ThermalReceipt({
   printerName,
   connectionType = 'browser',
   onClose,
+  hideActions = false,
 }: ThermalReceiptProps) {
   const [printing, setPrinting] = React.useState(false)
   const [printSuccess, setPrintSuccess] = React.useState(false)
@@ -104,39 +106,41 @@ export function ThermalReceipt({
       )}
 
       {/* Action buttons */}
-      <div className="flex flex-wrap gap-2 justify-center w-full max-w-sm">
-        <Button
-          onClick={handlePrint}
-          disabled={printing}
-          className="flex-1 bg-[#43291F] hover:bg-[#341F17] text-white"
-        >
-          {printing ? (
-            <RefreshCw className="h-4 w-4 animate-spin mr-1.5" />
-          ) : (
-            <Printer className="h-4 w-4 mr-1.5" />
-          )}
-          Print Bill
-        </Button>
-
-        <Button
-          onClick={handleDownloadText}
-          variant="outline"
-          className="border-[#E8DED0] text-[#43291F]"
-        >
-          <Download className="h-4 w-4 mr-1.5" />
-          Export Text
-        </Button>
-
-        {onClose && (
+      {!hideActions && (
+        <div className="flex flex-wrap gap-2 justify-center w-full max-w-sm">
           <Button
-            onClick={onClose}
-            variant="secondary"
-            className="w-full bg-[#EFE7DA] text-[#43291F]"
+            onClick={handlePrint}
+            disabled={printing}
+            className="flex-1 bg-[#43291F] hover:bg-[#341F17] text-white"
           >
-            Done & New Sale
+            {printing ? (
+              <RefreshCw className="h-4 w-4 animate-spin mr-1.5" />
+            ) : (
+              <Printer className="h-4 w-4 mr-1.5" />
+            )}
+            Print Bill
           </Button>
-        )}
-      </div>
+
+          <Button
+            onClick={handleDownloadText}
+            variant="outline"
+            className="border-[#E8DED0] text-[#43291F]"
+          >
+            <Download className="h-4 w-4 mr-1.5" />
+            Export Text
+          </Button>
+
+          {onClose && (
+            <Button
+              onClick={onClose}
+              variant="secondary"
+              className="w-full bg-[#EFE7DA] text-[#43291F]"
+            >
+              Done & New Sale
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   )
 }
