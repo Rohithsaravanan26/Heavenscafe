@@ -66,63 +66,82 @@ export async function getCategoriesAdmin() {
 }
 
 export async function addProductAction(formData: FormData) {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return { success: false, error: 'Unauthorized' }
+  try {
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { success: false, error: 'Unauthorized: Session required' }
 
-  const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user.id).single()
-  if (profile?.role !== 'ADMIN') return { success: false, error: 'Admin permission required' }
+    const { data: profile } = await supabase.from('profiles').select('shop_id, role').eq('id', user.id).single()
+    if (profile?.role !== 'ADMIN') return { success: false, error: 'Admin permission required' }
 
-  const shopId = profile.shop_id
-  const name = formData.get('name') as string
-  const categoryId = formData.get('category_id') as string
-  const basePrice = Number(formData.get('base_price'))
-  const costPrice = Number(formData.get('cost_price') || 0)
-  const currentStock = parseInt((formData.get('current_stock') as string) || '50', 10)
-  const minStock = parseInt((formData.get('min_stock') as string) || '10', 10)
-  const description = (formData.get('description') as string) || null
-  const trackInventory = formData.get('track_inventory') === 'true'
-  const isAvailable = formData.get('is_available') !== 'false'
+    // Fallback for shopId if not set on profile
+    let shopId = profile.shop_id
+    if (!shopId) {
+      const { data: defaultShop } = await supabase.from('shops').select('id').limit(1).single()
+      shopId = defaultShop?.id
+    }
+    if (!shopId) return { success: false, error: 'Shop profile missing' }
 
-  if (!name || !categoryId || isNaN(basePrice) || basePrice < 0) {
-    return { success: false, error: 'Valid name, category, and non-negative price required' }
-  }
+    const name = (formData.get('name') as string)?.trim()
+    const categoryId = formData.get('category_id') as string
+    const basePrice = Number(formData.get('base_price'))
+    const costPrice = Number(formData.get('cost_price') || 0)
+    const currentStock = parseInt((formData.get('current_stock') as string) || '50', 10)
+    const minStock = parseInt((formData.get('min_stock') as string) || '10', 10)
+    const description = (formData.get('description') as string) || null
+    const trackInventory = formData.get('track_inventory') === 'true'
+    const isAvailable = formData.get('is_available') !== 'false'
 
-  const { data: newProd, error } = await supabase
-    .from('products')
-    .insert({
+    if (!name || !categoryId || isNaN(basePrice) || basePrice < 0) {
+      return { success: false, error: 'Valid name, category, and non-negative price required' }
+    }
+
+    const { data: newProd, error } = await supabase
+      .from('products')
+      .insert({
+        shop_id: shopId,
+        category_id: categoryId,
+        name,
+        base_price: basePrice,
+        cost_price: costPrice,
+        current_stock: currentStock,
+        min_stock: minStock,
+        track_stock: true,
+        description,
+        track_inventory: trackInventory,
+        is_available: isAvailable,
+        is_active: true,
+      })
+      .select(`
+        *,
+        menu_categories (name)
+      `)
+      .single()
+
+    if (error) {
+      console.error('addProductAction insert error:', error.message)
+      return { success: false, error: error.message }
+    }
+
+    // Log audit
+    await supabase.from('audit_logs').insert({
       shop_id: shopId,
-      category_id: categoryId,
-      name,
-      base_price: basePrice,
-      cost_price: costPrice,
-      current_stock: currentStock,
-      min_stock: minStock,
-      track_stock: true,
-      description,
-      track_inventory: trackInventory,
-      is_available: isAvailable,
-      is_active: true,
+      user_id: user.id,
+      action_type: 'PRODUCT_CREATED',
+      table_name: 'products',
+      record_id: newProd.id,
+      new_value: { name, base_price: basePrice, cost_price: costPrice },
     })
-    .select()
-    .single()
 
-  if (error) return { success: false, error: error.message }
-
-  // Log audit
-  await supabase.from('audit_logs').insert({
-    shop_id: shopId,
-    user_id: user.id,
-    action_type: 'PRODUCT_CREATED',
-    table_name: 'products',
-    record_id: newProd.id,
-    new_value: { name, base_price: basePrice, cost_price: costPrice },
-  })
-
-  revalidatePath('/admin/menu')
-  revalidatePath('/admin/inventory')
-  revalidatePath('/pos')
-  return { success: true, product: newProd }
+    revalidatePath('/admin/menu')
+    revalidatePath('/admin/inventory')
+    revalidatePath('/pos')
+    return { success: true, product: newProd }
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('addProductAction unexpected error:', msg)
+    return { success: false, error: msg }
+  }
 }
 
 export async function updateProductAction(productId: string, formData: FormData) {

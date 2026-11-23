@@ -9,10 +9,7 @@ export async function getExpenses(month?: number, year?: number, paymentSource?:
 
   let query = supabase
     .from('expenses')
-    .select(`
-      *,
-      profiles:recorded_by (full_name)
-    `)
+    .select('*')
     .order('expense_date', { ascending: false })
     .order('created_at', { ascending: false })
 
@@ -31,11 +28,32 @@ export async function getExpenses(month?: number, year?: number, paymentSource?:
 
   const { data, error } = await query
 
-  if (error) {
-    console.error('getExpenses error:', error.message)
+  if (error || !data) {
+    console.error('getExpenses error:', error?.message)
     return []
   }
-  return data || []
+
+  // Safely map recorded_by user profile names
+  const userIds = Array.from(new Set(data.map((d) => d.recorded_by).filter(Boolean)))
+  let profileMap: Record<string, string> = {}
+  if (userIds.length > 0) {
+    const { data: profs } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', userIds)
+    if (profs) {
+      profs.forEach((p) => {
+        profileMap[p.id] = p.full_name
+      })
+    }
+  }
+
+  return data.map((item) => ({
+    ...item,
+    profiles: {
+      full_name: profileMap[item.recorded_by] || 'Store Staff',
+    },
+  }))
 }
 
 export async function getTodayExpensesAction() {
@@ -44,18 +62,35 @@ export async function getTodayExpensesAction() {
 
   const { data, error } = await supabase
     .from('expenses')
-    .select(`
-      *,
-      profiles:recorded_by (full_name)
-    `)
+    .select('*')
     .eq('expense_date', todayStr)
     .order('created_at', { ascending: false })
 
-  if (error) {
-    console.error('getTodayExpensesAction error:', error.message)
+  if (error || !data) {
+    console.error('getTodayExpensesAction error:', error?.message)
     return []
   }
-  return data || []
+
+  const userIds = Array.from(new Set(data.map((d) => d.recorded_by).filter(Boolean)))
+  let profileMap: Record<string, string> = {}
+  if (userIds.length > 0) {
+    const { data: profs } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', userIds)
+    if (profs) {
+      profs.forEach((p) => {
+        profileMap[p.id] = p.full_name
+      })
+    }
+  }
+
+  return data.map((item) => ({
+    ...item,
+    profiles: {
+      full_name: profileMap[item.recorded_by] || 'Store Staff',
+    },
+  }))
 }
 
 export async function getTodayCashExpensesTotalAction(): Promise<number> {
@@ -134,6 +169,8 @@ export async function addExpenseAction(formData: FormData) {
   revalidatePath('/pos/closing')
   revalidatePath('/admin/expenses')
   revalidatePath('/admin/reports')
+  revalidatePath('/admin/audit')
+  revalidatePath('/admin')
   return { success: true, expense: data }
 }
 
@@ -152,5 +189,7 @@ export async function deleteExpenseAction(expenseId: string) {
   revalidatePath('/pos/expenses')
   revalidatePath('/admin/expenses')
   revalidatePath('/admin/reports')
+  revalidatePath('/admin/audit')
+  revalidatePath('/admin')
   return { success: true }
 }

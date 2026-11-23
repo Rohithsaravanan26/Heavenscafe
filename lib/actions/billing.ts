@@ -277,19 +277,47 @@ export async function recordProductWastageAction(payload: {
     p_notes: payload.notes || null,
   })
 
-  if (error) return { success: false, error: error.message }
+  if (error) {
+    console.error('recordProductWastageAction error:', error.message)
+    return { success: false, error: error.message }
+  }
+
+  // Record audit log for Admin panel
+  await supabase.from('audit_logs').insert({
+    shop_id: profile.shop_id,
+    user_id: user.id,
+    action_type: 'PRODUCT_WASTAGE',
+    table_name: 'product_wastages',
+    record_id: data?.wastage_id || null,
+    new_value: {
+      product_name: data?.product_name || 'Product',
+      quantity_wasted: payload.quantity,
+      reason: payload.reason,
+      total_loss: data?.total_loss || 0,
+      remaining_stock: data?.new_stock,
+    },
+  })
+
+  revalidatePath('/pos/wastage')
+  revalidatePath('/pos/closing')
+  revalidatePath('/pos')
+  revalidatePath('/admin/inventory')
+  revalidatePath('/admin/reports')
+  revalidatePath('/admin/audit')
+  revalidatePath('/admin')
+
   return { success: true, result: data }
 }
 
 export async function getProductWastagesAction(startDate?: string, endDate?: string) {
   const supabase = await createClient()
 
+  // Avoid relational join error on auth.users/profiles by querying products join then mapping profiles
   let query = supabase
     .from('product_wastages')
     .select(`
       *,
-      products (name, base_price, cost_price),
-      profiles:manager_id (full_name)
+      products (name, base_price, cost_price)
     `)
     .order('created_at', { ascending: false })
 
@@ -297,8 +325,32 @@ export async function getProductWastagesAction(startDate?: string, endDate?: str
   if (endDate) query = query.lte('wastage_date', endDate)
 
   const { data, error } = await query.limit(100)
-  if (error) return []
-  return data || []
+  if (error || !data) {
+    console.error('getProductWastagesAction error:', error?.message)
+    return []
+  }
+
+  // Safely map manager profile names
+  const managerIds = Array.from(new Set(data.map((d) => d.manager_id).filter(Boolean)))
+  let profileMap: Record<string, string> = {}
+  if (managerIds.length > 0) {
+    const { data: profs } = await supabase
+      .from('profiles')
+      .select('id, full_name')
+      .in('id', managerIds)
+    if (profs) {
+      profs.forEach((p) => {
+        profileMap[p.id] = p.full_name
+      })
+    }
+  }
+
+  return data.map((item) => ({
+    ...item,
+    profiles: {
+      full_name: profileMap[item.manager_id] || 'Store Manager',
+    },
+  }))
 }
 
 export async function getCommercialSummaryAction(startDate?: string, endDate?: string) {

@@ -58,6 +58,7 @@ export function AdminMenuManager({
   const [showAddCategoryModal, setShowAddCategoryModal] = React.useState(false)
   const [productToDelete, setProductToDelete] = React.useState<any | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = React.useState(false)
+  const [addModalError, setAddModalError] = React.useState<string | null>(null)
 
   // Live calculation states for Add modal
   const [addBasePrice, setAddBasePrice] = React.useState<number>(0)
@@ -597,23 +598,33 @@ export function AdminMenuManager({
       </Dialog>
 
       {/* ── ADD PRODUCT MODAL (With Live Profit Calculator) ── */}
-      <Dialog open={showAddProductModal} onOpenChange={setShowAddProductModal}>
+      <Dialog open={showAddProductModal} onOpenChange={(open) => {
+        setShowAddProductModal(open)
+        if (!open) setAddModalError(null)
+      }}>
         <DialogContent className="max-w-lg w-full max-h-[90dvh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>Add New Product to Menu</DialogTitle>
           </DialogHeader>
 
+          {addModalError && (
+            <Alert variant="destructive" className="my-2">
+              <AlertDescription>{addModalError}</AlertDescription>
+            </Alert>
+          )}
+
           <form
             action={async (formData) => {
               setLoading(true)
+              setAddModalError(null)
               const res = await addProductAction(formData)
               setLoading(false)
               if (res.success && res.product) {
-                setProducts((prev) => [...prev, res.product])
+                setProducts((prev) => [res.product, ...prev])
                 setShowAddProductModal(false)
                 setStatusMsg({ type: 'success', text: `Product "${res.product.name}" added successfully.` })
               } else {
-                setStatusMsg({ type: 'error', text: res.error || 'Failed to add product' })
+                setAddModalError(res.error || 'Failed to add product')
               }
             }}
             className="space-y-4 pt-2"
